@@ -1,0 +1,29 @@
+{
+  "name": "hotel-pms-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "author": "Adwait Kamble",
+  "description": "Production-grade Hotel Property Management System Monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "main": "apps/mobile/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "npm run generate --workspace=@hotel-pms/database && npm run --workspaces --if-present build",
+    "dev:api": "npm run dev --workspace=@hotel-pms/api",
+    "dev:mobile": "npm run start --workspace=@hotel-pms/mobile",
+    "start": "expo start apps/mobile",
+    "seed": "npm run seed --workspace=@hotel-pms/api",
+    "test:concurrency": "npm run test:concurrency --workspace=@hotel-pms/api",
+    "db:generate": "npm run generate --workspace=@hotel-pms/database",
+    "db:push": "npm run db:push --workspace=@hotel-pms/database"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "prisma": "^6.3.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "@hotel-pms/mobile",
+  "version": "1.0.0",
+  "description": "Mobile Frontend placeholder for Hotel Property Management System",
+  "author": "Adwait Kamble",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "test:e2e": "tsx src/test/mobile-e2e.test.ts"
+  },
+  "dependencies": {
+    "@hotel-pms/types": "*",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "~56.0.0",
+    "expo-constants": "~56.0.22",
+    "react": "19.2.3",
+    "react-dom": "^19.2.3",
+    "react-native": "0.85.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-web": "^0.21.2",
+    "socket.io-client": "^4.8.3"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.14",
+    "typescript": "^5.7.2"
+  }
+}

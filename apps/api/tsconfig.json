@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["src/test/**/*", "src/**/*.test.ts", "src/concurrency-test.ts", "src/realtime-test.ts", "src/invoice-test.ts", "src/channel-sync-test.ts", "src/calendar-sync-test.ts"]
+}

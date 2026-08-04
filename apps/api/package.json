@@ -1,0 +1,41 @@
+{
+  "name": "@hotel-pms/api",
+  "version": "1.0.0",
+  "description": "Backend Node.js/Express API for Hotel Property Management System",
+  "author": "Adwait Kamble",
+  "private": true,
+  "type": "module",
+  "main": "./dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "seed": "tsx src/seed.ts",
+    "test:concurrency": "tsx src/concurrency-test.ts",
+    "test:realtime": "tsx src/realtime-test.ts",
+    "test:invoice": "tsx src/invoice-test.ts",
+    "test:channel": "tsx src/channel-sync-test.ts",
+    "test:saas": "tsx src/test/saas-auth-isolation.test.ts"
+  },
+  "dependencies": {
+    "@hotel-pms/database": "*",
+    "@hotel-pms/types": "*",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "googleapis": "^173.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.10.2",
+    "socket.io-client": "^4.8.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,212 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum RoomStatus {
+  Clean
+  Dirty
+  Maintenance
+}
+
+enum ReservationStatus {
+  Pending
+  Confirmed
+  CheckedIn
+  CheckedOut
+  Cancelled
+}
+
+enum StaffRole {
+  Housekeeper
+  FrontDesk
+  Manager
+}
+
+enum InvoiceStatus {
+  Unpaid
+  Paid
+  Refunded
+}
+
+enum InvoiceItemCategory {
+  Room
+  FoodAndBeverage
+  Laundry
+  Tax
+  Other
+}
+
+model Chains {
+  id         String       @id @default(uuid())
+  name       String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  properties Properties[]
+
+  @@map("Chains")
+}
+
+model Users {
+  id           String     @id @default(uuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  mobileNumber String?
+  propertyId   String
+  property     Properties @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("Users")
+}
+
+model Properties {
+  id             String           @id @default(uuid())
+  name           String
+  address        String           @default("")
+  city           String
+  country        String
+  currency       String           @default("INR")
+  zipCode        String?
+  chainId        String
+  chain          Chains           @relation(fields: [chainId], references: [id], onDelete: Cascade)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  users          Users[]
+  roomCategories RoomCategories[]
+
+  @@map("Properties")
+}
+
+model RoomCategories {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  basePrice   Float
+  propertyId  String
+  property    Properties @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  rooms       Rooms[]
+
+  @@map("RoomCategories")
+}
+
+model Rooms {
+  id             String           @id @default(uuid())
+  roomNumber     String
+  status         RoomStatus       @default(Clean)
+  roomCategoryId String
+  roomCategory   RoomCategories   @relation(fields: [roomCategoryId], references: [id], onDelete: Cascade)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  reservations   Reservations[]
+  statusLogs     RoomStatusLogs[]
+
+  @@unique([roomCategoryId, roomNumber])
+  @@map("Rooms")
+}
+
+model Guests {
+  id             String         @id @default(uuid())
+  name           String
+  email          String         @unique
+  phone          String
+  address        String?
+  pincode        String?
+  idNumber       String?
+  passportNumber String?
+  dob            DateTime?
+  hostName       String?
+  hostPhone      String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  reservations   Reservations[]
+  invoices       Invoices[]
+
+  @@map("Guests")
+}
+
+model Reservations {
+  id           String            @id @default(uuid())
+  guestId      String
+  guest        Guests            @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  roomId       String
+  room         Rooms             @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  checkIn      DateTime
+  checkOut     DateTime
+  checkInTime  String            @default("12:00 PM")
+  checkOutTime String            @default("11:00 AM")
+  adults       Int               @default(1)
+  children     Int               @default(0)
+  totalAmount  Float
+  advancePaid  Float             @default(0)
+  notes        String?
+  status       ReservationStatus @default(Pending)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  invoices     Invoices[]
+
+  @@map("Reservations")
+}
+
+model Staff {
+  id             String           @id @default(uuid())
+  name           String
+  email          String           @unique
+  role           StaffRole        @default(Housekeeper)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  roomStatusLogs RoomStatusLogs[]
+
+  @@map("Staff")
+}
+
+model RoomStatusLogs {
+  id                      String     @id @default(uuid())
+  roomId                  String
+  room                    Rooms      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  previousStatus          RoomStatus
+  newStatus               RoomStatus
+  changedAt               DateTime   @default(now())
+  turnoverDurationSeconds Int?
+  staffId                 String?
+  staff                   Staff?     @relation(fields: [staffId], references: [id], onDelete: SetNull)
+
+  @@map("RoomStatusLogs")
+}
+
+model Invoices {
+  id            String         @id @default(uuid())
+  reservationId String
+  reservation   Reservations   @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  guestId       String
+  guest         Guests         @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  subtotal      Float
+  taxAmount     Float
+  grandTotal    Float
+  status        InvoiceStatus  @default(Unpaid)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  items         InvoiceItems[]
+
+  @@map("Invoices")
+}
+
+model InvoiceItems {
+  id          String              @id @default(uuid())
+  invoiceId   String
+  invoice     Invoices            @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  amount      Float
+  quantity    Int                 @default(1)
+  category    InvoiceItemCategory @default(Room)
+  createdAt   DateTime            @default(now())
+
+  @@map("InvoiceItems")
+}

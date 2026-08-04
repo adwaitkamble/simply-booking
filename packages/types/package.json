@@ -1,0 +1,22 @@
+{
+  "name": "@hotel-pms/types",
+  "version": "1.0.0",
+  "description": "Shared TypeScript types and interfaces for Hotel PMS",
+  "author": "Adwait Kamble",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}
