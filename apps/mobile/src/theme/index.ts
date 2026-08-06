@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { colors } from './colors';
 
 export { colors };
@@ -45,27 +46,42 @@ export const typography = {
 };
 
 export const shadows = {
-  card: {
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  cardHover: {
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.09,
-    shadowRadius: 14,
-    elevation: 4,
-  },
-  modal: {
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 8,
-  },
+  card: Platform.select({
+    web: {
+      boxShadow: '0px 3px 8px rgba(15, 23, 42, 0.05)',
+    },
+    default: {
+      shadowColor: '#0F172A',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+  }),
+  cardHover: Platform.select({
+    web: {
+      boxShadow: '0px 6px 14px rgba(15, 23, 42, 0.09)',
+    },
+    default: {
+      shadowColor: '#0F172A',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.09,
+      shadowRadius: 14,
+      elevation: 4,
+    },
+  }),
+  modal: Platform.select({
+    web: {
+      boxShadow: '0px 10px 20px rgba(15, 23, 42, 0.12)',
+    },
+    default: {
+      shadowColor: '#0F172A',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.12,
+      shadowRadius: 20,
+      elevation: 8,
+    },
+  }),
 };
 
 export const spacing = {
