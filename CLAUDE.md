@@ -14,4 +14,4 @@
 # Workflow Rules
 - Never use mock data for testing database relations; always write a dedicated seed script to verify foreign key constraints against a live local database.
 - Always run scripts from the root directory using workspace commands.
-- Stop and ask for permission before executing destructive database drops or migrations.
+- Stop and ask for permission before executing destructive database drops or migrations.    

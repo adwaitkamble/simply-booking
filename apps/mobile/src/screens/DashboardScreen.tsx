@@ -87,27 +87,58 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [roomModalError, setRoomModalError] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
 
-  // Generate 7-day array
+  // View Mode: weekly (7 days) or monthly (full calendar month)
+  const [viewMode, setViewMode] = useState<'weekly' | 'monthly'>('weekly');
+
+  const todayStr = useMemo(() => {
+    const today = new Date();
+    return today.toISOString().slice(0, 10);
+  }, []);
+
+  // Generate date array based on weekly or monthly view
   const dateColumns = useMemo(() => {
     const dates = [];
     const daysOfWeek = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(baseDate);
-      d.setUTCDate(baseDate.getUTCDate() + i);
-      const isoDate = d.toISOString().slice(0, 10);
-      dates.push({
-        date: d,
-        isoDate,
-        dayName: daysOfWeek[d.getUTCDay()],
-        dayNum: String(d.getUTCDate()).padStart(2, '0'),
-        monthName: months[d.getUTCMonth()],
-        isToday: i === 0,
-      });
+    if (viewMode === 'weekly') {
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(baseDate);
+        d.setUTCDate(baseDate.getUTCDate() + i);
+        const isoDate = d.toISOString().slice(0, 10);
+        dates.push({
+          date: d,
+          isoDate,
+          dayName: daysOfWeek[d.getUTCDay()],
+          dayNum: String(d.getUTCDate()).padStart(2, '0'),
+          monthName: months[d.getUTCMonth()],
+          isToday: isoDate === todayStr,
+          isWeekend: d.getUTCDay() === 0 || d.getUTCDay() === 6,
+        });
+      }
+    } else {
+      // Monthly view: Show all days of the current month of baseDate, starting from the 1st
+      const year = baseDate.getUTCFullYear();
+      const month = baseDate.getUTCMonth();
+      // Total days in the current month
+      const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+      
+      for (let i = 1; i <= daysInMonth; i++) {
+        const d = new Date(Date.UTC(year, month, i));
+        const isoDate = d.toISOString().slice(0, 10);
+        dates.push({
+          date: d,
+          isoDate,
+          dayName: daysOfWeek[d.getUTCDay()],
+          dayNum: String(i).padStart(2, '0'),
+          monthName: months[month],
+          isToday: isoDate === todayStr,
+          isWeekend: d.getUTCDay() === 0 || d.getUTCDay() === 6,
+        });
+      }
     }
     return dates;
-  }, [baseDate]);
+  }, [baseDate, viewMode, todayStr]);
 
   const loadData = useCallback(async () => {
     try {
@@ -198,6 +229,34 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     setBaseDate(today);
   };
 
+  const handlePrevRange = () => {
+    setBaseDate((prev) => {
+      const next = new Date(prev);
+      if (viewMode === 'weekly') {
+        next.setUTCDate(prev.getUTCDate() - 7);
+      } else {
+        // Go to 1st of previous month
+        next.setUTCMonth(prev.getUTCMonth() - 1);
+        next.setUTCDate(1);
+      }
+      return next;
+    });
+  };
+
+  const handleNextRange = () => {
+    setBaseDate((prev) => {
+      const next = new Date(prev);
+      if (viewMode === 'weekly') {
+        next.setUTCDate(prev.getUTCDate() + 7);
+      } else {
+        // Go to 1st of next month
+        next.setUTCMonth(prev.getUTCMonth() + 1);
+        next.setUTCDate(1);
+      }
+      return next;
+    });
+  };
+
   // Add Room Submission
   const handleSaveRoom = async () => {
     if (!newRoomNumber.trim()) {
@@ -229,12 +288,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
   // Compute position and span of reservations for a room
   const getRoomReservationBlocks = (roomId: string) => {
+    if (!dateColumns || dateColumns.length === 0) return [];
+
     const roomRes = reservations.filter(
       (r) => r.roomId === roomId && r.status !== 'Cancelled'
     );
 
     const windowStart = dateColumns[0].date.getTime();
-    const windowEnd = dateColumns[6].date.getTime() + 86400000;
+    const windowEnd = dateColumns[dateColumns.length - 1].date.getTime() + 86400000;
 
     return roomRes
       .map((res) => {
@@ -247,7 +308,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             (checkInTime - windowStart) / (1000 * 60 * 60 * 24)
           );
           const endDiffDays = Math.min(
-            7,
+            dateColumns.length,
             (checkOutTime - windowStart) / (1000 * 60 * 60 * 24)
           );
           const spanDays = Math.max(1, endDiffDays - startDiffDays);
@@ -288,7 +349,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     .slice(0, 2)
     .toUpperCase() || 'SP';
   const propertyLocation = `${property?.city || 'Pune'}, ${property?.country || 'India'}`;
-  const dateRangeStr = `${dateColumns[0]?.dayNum} - ${dateColumns[6]?.dayNum} ${dateColumns[0]?.monthName}, ${dateColumns[0]?.date.getUTCFullYear()}`;
+  const dateRangeStr = dateColumns.length > 0 
+    ? `${dateColumns[0]?.dayNum} ${dateColumns[0]?.monthName} - ${dateColumns[dateColumns.length - 1]?.dayNum} ${dateColumns[dateColumns.length - 1]?.monthName}, ${dateColumns[0]?.date.getUTCFullYear()}`
+    : '';
 
   return (
     <View style={styles.container}>
@@ -311,21 +374,61 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </View>
         </View>
 
-        {/* Date Range Selection Pill */}
-        <TouchableOpacity
-          style={styles.dateBarWrapper}
-          onPress={() => setShowDatePicker(true)}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.dateBarLabel}>Date range</Text>
-          <View style={styles.dateBarValueRow}>
-            <Text style={styles.dateBarIcon}>📅</Text>
-            <Text style={styles.dateBarValueText}>
-              {dateRangeStr}
+        {/* View Mode Toggle Row */}
+        <View style={styles.viewModeToggleRow}>
+          <TouchableOpacity
+            style={[styles.viewModeBtn, viewMode === 'weekly' && styles.viewModeBtnActive]}
+            onPress={() => setViewMode('weekly')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.viewModeBtnText, viewMode === 'weekly' && styles.viewModeBtnTextActive]}>
+              📅 7-Day View
             </Text>
-            <Text style={styles.dateBarDropdownArrow}>▼</Text>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.viewModeBtn, viewMode === 'monthly' && styles.viewModeBtnActive]}
+            onPress={() => setViewMode('monthly')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.viewModeBtnText, viewMode === 'monthly' && styles.viewModeBtnTextActive]}>
+              🗓️ Monthly View
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Date Selector Row with Arrows */}
+        <View style={styles.dateSelectorRow}>
+          <TouchableOpacity
+            style={styles.dateNavBtn}
+            onPress={handlePrevRange}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.dateNavBtnText}>◀</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.dateBarWrapper}
+            onPress={() => setShowDatePicker(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.dateBarLabel}>{viewMode === 'weekly' ? '7-Day Range' : 'Monthly Range'}</Text>
+            <View style={styles.dateBarValueRow}>
+              <Text style={styles.dateBarIcon}>📅</Text>
+              <Text style={styles.dateBarValueText} numberOfLines={1}>
+                {dateRangeStr}
+              </Text>
+              <Text style={styles.dateBarDropdownArrow}>▼</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.dateNavBtn}
+            onPress={handleNextRange}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.dateNavBtnText}>▶</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* 2. Main 2D Gantt Chart Grid Area */}
@@ -392,7 +495,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               nestedScrollEnabled={true}
               scrollEventThrottle={16}
             >
-              <View style={{ width: DATE_COL_WIDTH * 7 }}>
+              <View style={{ width: DATE_COL_WIDTH * dateColumns.length }}>
                 {/* Date Columns Header Row */}
                 <View style={styles.rightHeaderRow}>
                   {dateColumns.map((col) => (
@@ -401,6 +504,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                       style={[
                         styles.dateHeaderCell,
                         col.isToday && styles.dateHeaderCellToday,
+                        col.isWeekend && styles.dateHeaderCellWeekend,
                       ]}
                     >
                       <Text
@@ -445,6 +549,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                             style={[
                               styles.matrixCellBg,
                               idx % 2 === 1 && styles.matrixCellBgAlt,
+                              col.isWeekend && styles.matrixCellBgWeekend,
                             ]}
                             activeOpacity={0.6}
                             delayPressIn={50}
@@ -750,8 +855,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       {/* 6. Date Picker Modal for Dashboard Date Range Selection */}
       <GoogleCalendarDatePickerModal
         visible={showDatePicker}
-        checkIn={baseDate.toISOString().slice(0, 10)}
-        checkOut={new Date(baseDate.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}
+        checkIn={dateColumns[0]?.isoDate || baseDate.toISOString().slice(0, 10)}
+        checkOut={dateColumns[dateColumns.length - 1]?.isoDate || new Date(baseDate.getTime() + (viewMode === 'weekly' ? 6 : 29) * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)}
         onClose={() => setShowDatePicker(false)}
         existingReservations={reservations}
         onApply={(newIn, newOut) => {
@@ -809,11 +914,56 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 20,
   },
-  dateBarWrapper: {
+  viewModeToggleRow: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 8,
+    padding: 3,
+    marginBottom: 12,
+  },
+  viewModeBtn: {
+    flex: 1,
+    paddingVertical: 6,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  viewModeBtnActive: {
+    backgroundColor: '#ffffff',
+  },
+  viewModeBtnText: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  viewModeBtnTextActive: {
+    color: '#0066FF',
+    fontWeight: '800',
+  },
+  dateSelectorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  dateNavBtn: {
+    width: 40,
+    height: 48,
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateNavBtnText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  dateBarWrapper: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   dateBarLabel: {
     color: 'rgba(255, 255, 255, 0.7)',
@@ -929,6 +1079,9 @@ const styles = StyleSheet.create({
   dateHeaderCellToday: {
     backgroundColor: '#F7FAFC',
   },
+  dateHeaderCellWeekend: {
+    backgroundColor: '#FFF8F8',
+  },
   dayNameText: {
     fontSize: 11,
     color: '#718096',
@@ -964,6 +1117,9 @@ const styles = StyleSheet.create({
   },
   matrixCellBgAlt: {
     backgroundColor: '#FAFCFF',
+  },
+  matrixCellBgWeekend: {
+    backgroundColor: '#FFFBFB',
   },
   emptyCellIconBox: {
     width: 28,

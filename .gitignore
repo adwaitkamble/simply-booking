@@ -8,3 +8,5 @@ build/
 Thumbs.db
 .expo/
 .turbo/
+
+pms-key.pem
