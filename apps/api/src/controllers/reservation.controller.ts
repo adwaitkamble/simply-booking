@@ -85,13 +85,15 @@ export class ReservationController {
       const result = await ReservationService.sendWhatsAppNotification({
         guestName: target.guest?.name || 'Guest',
         guestPhone: target.guest?.phone || '',
-        propertyName: target.room?.roomCategory?.property?.name || 'Simply Booking Hotel',
+        propertyName: target.room?.roomCategory?.property?.name || 'Hotel Property',
         roomNumber: target.room?.roomNumber || '',
         checkIn: target.checkIn.toISOString().slice(0, 10),
         checkOut: target.checkOut.toISOString().slice(0, 10),
         totalAmount: total,
+        advancePaid: advance,
         pendingAmount: pending,
         currency: target.room?.roomCategory?.property?.currency || 'INR',
+        bookingRef: target.id,
       });
 
       res.json({

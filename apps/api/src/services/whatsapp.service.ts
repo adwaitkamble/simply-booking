@@ -8,8 +8,10 @@ export interface WhatsAppPayload {
   checkIn: string;
   checkOut: string;
   totalAmount: number;
+  advancePaid?: number;
   pendingAmount: number;
   currency: string;
+  bookingRef?: string;
   calendarLink?: string;
 }
 
@@ -18,7 +20,20 @@ export class WhatsAppService {
    * Send WhatsApp booking confirmation message via Twilio (with mock fallback)
    */
   static async sendBookingConfirmation(payload: WhatsAppPayload): Promise<{ success: boolean; messageId?: string; mode: 'live' | 'mock' }> {
-    const { guestName, guestPhone, propertyName, roomNumber, checkIn, checkOut, totalAmount, pendingAmount, currency, calendarLink } = payload;
+    const {
+      guestName,
+      guestPhone,
+      propertyName,
+      roomNumber,
+      checkIn,
+      checkOut,
+      totalAmount,
+      advancePaid = 0,
+      pendingAmount,
+      currency,
+      bookingRef,
+      calendarLink,
+    } = payload;
 
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -27,27 +42,32 @@ export class WhatsAppService {
     // Normalize phone number: Ensure it has 'whatsapp:' prefix for Twilio, and strip space
     let formattedPhone = guestPhone.replace(/\s+/g, '');
     if (!formattedPhone.startsWith('whatsapp:')) {
-      // Ensure phone has + country code prefix, default to +91 if none
       if (!formattedPhone.startsWith('+')) {
         formattedPhone = '+' + formattedPhone;
       }
       formattedPhone = `whatsapp:${formattedPhone}`;
     }
 
+    const hotelName = propertyName && propertyName.trim() ? propertyName.trim() : 'Hotel Property';
     const formattedTotal = Number(totalAmount).toLocaleString('en-IN');
+    const formattedAdvance = Number(advancePaid).toLocaleString('en-IN');
     const formattedPending = Number(pendingAmount).toLocaleString('en-IN');
+    const currencySymbol = currency === 'INR' ? '₹' : currency;
 
-    const messageBody = `Hello ${guestName},\n\n` +
-      `Your booking at *${propertyName}* is confirmed! 🎉\n\n` +
+    const messageBody =
+      `Hello ${guestName},\n\n` +
+      `Your booking at *${hotelName}* is confirmed! 🎉\n\n` +
+      (bookingRef ? `🆔 *Booking Ref:* ${bookingRef}\n` : '') +
       `🏨 *Room:* Room ${roomNumber}\n` +
       `📅 *Check-in:* ${checkIn}\n` +
       `📅 *Check-out:* ${checkOut}\n` +
-      `💰 *Total Amount:* ${currency} ${formattedTotal}\n` +
-      `💳 *Pending Amount:* ${currency} ${formattedPending}\n\n` +
+      `💰 *Total Amount:* ${currencySymbol}${formattedTotal}\n` +
+      `💳 *Advance Paid:* ${currencySymbol}${formattedAdvance}\n` +
+      `🔴 *Balance Due:* ${currencySymbol}${formattedPending}\n\n` +
       (calendarLink ? `📅 *Google Calendar Link:* ${calendarLink}\n\n` : '') +
-      `Thank you for choosing Simply Booking. Have a wonderful stay! 🌿`;
+      `Thank you for choosing *${hotelName}*. Have a wonderful stay! 🌿`;
 
-    // 1. Live Twilio API Integration (via native fetch to avoid dependencies)
+    // 1. Live Twilio API Integration
     if (accountSid && authToken) {
       try {
         const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
@@ -61,7 +81,7 @@ export class WhatsAppService {
         const response = await fetch(url, {
           method: 'POST',
           headers: {
-            'Authorization': authHeader,
+            Authorization: authHeader,
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: params.toString(),
@@ -81,7 +101,6 @@ export class WhatsAppService {
         };
       } catch (err: any) {
         console.warn(`⚠️ [WhatsApp Live Send Failed]: ${err.message}. Falling back to simulated log.`);
-        // Fall through to mock log
       }
     }
 

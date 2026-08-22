@@ -262,13 +262,15 @@ export class ReservationService {
       WhatsAppService.sendBookingConfirmation({
         guestName: createdReservation.guest.name,
         guestPhone: createdReservation.guest.phone,
-        propertyName: createdReservation.room.roomCategory?.property?.name || 'Simply Booking Hotel',
+        propertyName: createdReservation.room.roomCategory?.property?.name || 'Hotel Property',
         roomNumber: createdReservation.room.roomNumber,
         checkIn: createdReservation.checkIn.toISOString().slice(0, 10),
         checkOut: createdReservation.checkOut.toISOString().slice(0, 10),
         totalAmount: total,
+        advancePaid: advance,
         pendingAmount: pending,
         currency,
+        bookingRef: createdReservation.id,
         calendarLink: calendarLink || undefined,
       }).catch((waErr: any) => {
         console.warn(`⚠️ [WhatsApp Confirmation Error] Failed to send message: ${waErr.message}`);
