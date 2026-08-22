@@ -12,9 +12,10 @@ import {
   Platform,
   Alert,
 } from 'react-native';
-import { ApiClient, AvailableRoomItem } from '../api/client';
+import { ApiClient } from '../api/client';
 import { GoogleCalendarDatePickerModal } from '../components/GoogleCalendarDatePickerModal';
 import { colors, borderRadius, shadows } from '../theme';
+import { sendWhatsAppConfirmation } from '../utils/whatsapp';
 
 interface AddReservationScreenProps {
   initialRoomId?: string;
@@ -35,66 +36,98 @@ interface ServiceAddon {
 export const AddReservationScreen: React.FC<AddReservationScreenProps> = ({
   initialRoomId,
   initialRoomNumber,
-  initialCheckIn = '2026-12-01',
-  initialCheckOut = '2026-12-03',
+  initialCheckIn,
+  initialCheckOut,
   onBack,
   onBookingSuccess,
 }) => {
-  // Stay Parameters with robust date initialization
+  // Helper to format ISO date to DD-MM-YYYY format
+  const formatIsoToDdMmYyyy = (isoStr: string) => {
+    if (!isoStr) return '';
+    try {
+      const clean = isoStr.slice(0, 10);
+      const parts = clean.split('-');
+      if (parts.length === 3) {
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
+      return isoStr;
+    } catch {
+      return isoStr;
+    }
+  };
+
+  // Helper to get Today in ISO (YYYY-MM-DD)
+  const getTodayIsoStr = () => new Date().toISOString().slice(0, 10);
+  const getFutureIsoStr = (startIso?: string, days = 1) => {
+    const d = startIso ? new Date(startIso) : new Date();
+    if (isNaN(d.getTime())) d.setTime(Date.now());
+    const end = new Date(d.getTime() + days * 24 * 60 * 60 * 1000);
+    return end.toISOString().slice(0, 10);
+  };
+
+  // Stay Dates State
   const [checkIn, setCheckIn] = useState(() => {
-    const raw = initialCheckIn ? initialCheckIn.slice(0, 10) : '2026-12-01';
-    return isNaN(new Date(raw).getTime()) ? '2026-12-01' : raw;
+    const raw = initialCheckIn ? initialCheckIn.slice(0, 10) : getTodayIsoStr();
+    return isNaN(new Date(raw).getTime()) ? getTodayIsoStr() : raw;
   });
 
   const [checkOut, setCheckOut] = useState(() => {
-    const rawIn = initialCheckIn ? initialCheckIn.slice(0, 10) : '2026-12-01';
-    const rawOut = initialCheckOut ? initialCheckOut.slice(0, 10) : '2026-12-03';
+    const rawIn = initialCheckIn ? initialCheckIn.slice(0, 10) : getTodayIsoStr();
+    const rawOut = initialCheckOut ? initialCheckOut.slice(0, 10) : getFutureIsoStr(rawIn, 1);
     const dIn = new Date(rawIn);
     const dOut = new Date(rawOut);
     if (!isNaN(dIn.getTime()) && !isNaN(dOut.getTime()) && dOut.getTime() > dIn.getTime()) {
       return rawOut;
     }
-    // Fallback: 2 days after check-in
-    const safeOut = new Date(dIn.getTime() + 2 * 24 * 60 * 60 * 1000);
-    return safeOut.toISOString().slice(0, 10);
+    return getFutureIsoStr(rawIn, 1);
   });
 
   // Calendar Dashboard Modal & Existing Bookings State
   const [showCalendarModal, setShowCalendarModal] = useState<boolean>(false);
   const [existingReservations, setExistingReservations] = useState<any[]>([]);
 
+  // Timings & Occupancy
   const [checkInTime, setCheckInTime] = useState('12:00 PM');
   const [checkOutTime, setCheckOutTime] = useState('11:00 AM');
-  const [adults, setAdults] = useState(2);
-  const [children, setChildren] = useState(0);
+  const [adults, setAdults] = useState<number>(3);
+  const [children, setChildren] = useState<number>(0);
 
-  // Room Selection
-  const [availableRooms, setAvailableRooms] = useState<any[]>([]);
+  // Dropdown Pickers
+  const [showAdultsPicker, setShowAdultsPicker] = useState<boolean>(false);
+  const [showChildrenPicker, setShowChildrenPicker] = useState<boolean>(false);
+  const [showRoomPicker, setShowRoomPicker] = useState<boolean>(false);
+
+  // Room Selection State (All created rooms)
+  const [allRooms, setAllRooms] = useState<any[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<any | null>(null);
-  const [loadingRooms, setLoadingRooms] = useState(false);
-  const [showRoomPicker, setShowRoomPicker] = useState(false);
+  const [loadingRooms, setLoadingRooms] = useState<boolean>(true);
+  const [customAmount, setCustomAmount] = useState<string>('');
 
-  // Guest Details
+  // Primary Guest & Optional Fields matching Original Simply PMS Schema
   const [guestName, setGuestName] = useState('');
-  const [guestPhone, setGuestPhone] = useState('+91 ');
+  const [guestPhone, setGuestPhone] = useState('');
   const [guestEmail, setGuestEmail] = useState('');
   const [address, setAddress] = useState('');
-  const [pincode, setPincode] = useState('411001');
+  const [pincode, setPincode] = useState('');
   const [idNumber, setIdNumber] = useState('');
   const [passportNumber, setPassportNumber] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
-  const [hostName, setHostName] = useState('Front Desk - Adwait');
+  const [hostName, setHostName] = useState('');
+  const [hostPhone, setHostPhone] = useState('');
   const [notes, setNotes] = useState('');
 
   // Ancillary Services
   const [services, setServices] = useState<ServiceAddon[]>([
-    { id: 'srv-1', name: 'Airport Pickup & Drop (Pune Int)', price: 850, selected: false },
-    { id: 'srv-2', name: 'Buffet Breakfast Included (Per Stay)', price: 600, selected: false },
-    { id: 'srv-3', name: 'Ayurvedic Spa & Wellness Package', price: 1500, selected: false },
+    { id: 'srv-1', name: 'Airport Transfer', price: 800, selected: false },
+    { id: 'srv-2', name: 'Extra Bed / Mattress', price: 500, selected: false },
+    { id: 'srv-3', name: 'Laundry Service', price: 300, selected: false },
   ]);
+  const [showAddServiceModal, setShowAddServiceModal] = useState<boolean>(false);
+  const [newServiceName, setNewServiceName] = useState('');
+  const [newServicePrice, setNewServicePrice] = useState('');
 
-  // Financials
-  const [advancePaid, setAdvancePaid] = useState('1000');
+  // Advance Payment
+  const [advancePaid, setAdvancePaid] = useState<string>('0');
 
   // Status & Errors
   const [submitting, setSubmitting] = useState(false);
@@ -102,37 +135,51 @@ export const AddReservationScreen: React.FC<AddReservationScreenProps> = ({
   const [conflictError, setConflictError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Helper to validate date string
-  const isValidDateStr = (str: string) => {
-    if (!str || str.trim().length < 10) return false;
-    const d = new Date(str.trim().slice(0, 10));
-    return !isNaN(d.getTime());
-  };
+  // Load ALL Created Rooms for property from PostgreSQL database
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        setLoadingRooms(true);
+        const res = await ApiClient.fetchRoomsData();
+        const rawRooms = res.rooms || [];
 
-  // Helper to format date nicely
-  const formatDateDisplay = (dateStr: string) => {
-    if (!dateStr) return 'Select Date';
-    try {
-      const clean = dateStr.slice(0, 10);
-      const parts = clean.split('-');
-      if (parts.length === 3) {
-        const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-        if (!isNaN(d.getTime())) {
-          return d.toLocaleDateString('en-US', {
-            weekday: 'short',
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-          });
+        const formattedRooms = rawRooms.map((rm: any) => {
+          const category = rm.categoryName || 'Standard';
+          const roomNum = rm.roomName ? rm.roomName.replace('Room ', '') : rm.roomNumber || rm.roomId;
+          return {
+            id: rm.roomId || rm.id,
+            roomId: rm.roomId || rm.id,
+            roomNumber: roomNum,
+            categoryName: category,
+            displayName: `${category}-${roomNum} - ${category} ${roomNum}`,
+            pricePerNight: rm.pricePerNight || 2500,
+            status: rm.status,
+          };
+        });
+
+        setAllRooms(formattedRooms);
+
+        if (formattedRooms.length > 0) {
+          if (initialRoomId) {
+            const match = formattedRooms.find(
+              (r: any) => r.id === initialRoomId || r.roomId === initialRoomId || r.roomNumber === initialRoomNumber
+            );
+            setSelectedRoom(match || formattedRooms[0]);
+          } else if (!selectedRoom) {
+            setSelectedRoom(formattedRooms[0]);
+          }
         }
+      } catch (err) {
+        console.warn('Failed to load rooms list:', err);
+      } finally {
+        setLoadingRooms(false);
       }
-      return dateStr;
-    } catch {
-      return dateStr;
-    }
-  };
+    };
 
-  // Fetch all existing reservations to display live occupancy dots on the calendar
+    fetchRooms();
+  }, [initialRoomId, initialRoomNumber]);
+
+  // Fetch existing reservations for calendar occupancy matrix
   useEffect(() => {
     ApiClient.fetchReservations()
       .then((res) => {
@@ -141,56 +188,7 @@ export const AddReservationScreen: React.FC<AddReservationScreenProps> = ({
       .catch(() => {});
   }, []);
 
-  // Load available rooms on mount or date change
-  useEffect(() => {
-    const fetchRooms = async () => {
-      const cleanIn = checkIn.trim().slice(0, 10);
-      const cleanOut = checkOut.trim().slice(0, 10);
-
-      if (!isValidDateStr(cleanIn) || !isValidDateStr(cleanOut)) {
-        return; // Incomplete date input
-      }
-
-      const dIn = new Date(cleanIn);
-      const dOut = new Date(cleanOut);
-      if (dOut.getTime() <= dIn.getTime()) {
-        return; // Check-out must be after check-in
-      }
-
-      try {
-        setLoadingRooms(true);
-        const startIso = `${cleanIn}T14:00:00.000Z`;
-        const endIso = `${cleanOut}T10:00:00.000Z`;
-        const data = await ApiClient.fetchAvailableRooms(startIso, endIso);
-        setAvailableRooms(data);
-
-        // Preselect room if initialRoomId is provided
-        if (initialRoomId) {
-          const matched = data.find((r) => r.id === initialRoomId);
-          if (matched) {
-            setSelectedRoom(matched);
-          } else if (initialRoomNumber) {
-            // Fallback object
-            setSelectedRoom({
-              id: initialRoomId,
-              roomNumber: initialRoomNumber,
-              roomCategory: { name: 'Assigned Room', basePrice: 2500 },
-            });
-          }
-        } else if (data.length > 0 && (!selectedRoom || !data.some((r) => r.id === selectedRoom.id))) {
-          setSelectedRoom(data[0]);
-        }
-      } catch (err: any) {
-        console.warn('Failed to load rooms:', err?.message || err);
-      } finally {
-        setLoadingRooms(false);
-      }
-    };
-
-    fetchRooms();
-  }, [checkIn, checkOut, initialRoomId]);
-
-  // Calculate pricing
+  // Price Calculations (Nights, Room Price, Services, Total Amount, Advance, Balance)
   const calculations = useMemo(() => {
     let nights = 1;
     try {
@@ -202,60 +200,49 @@ export const AddReservationScreen: React.FC<AddReservationScreenProps> = ({
       nights = 1;
     }
 
-    const basePrice = Number(selectedRoom?.roomCategory?.basePrice || 2500);
-    const roomSubtotal = nights * basePrice;
+    const roomPrice = customAmount !== '' ? Number(customAmount) || 0 : Number(selectedRoom?.pricePerNight || 2500);
+    const roomSubtotal = nights * roomPrice;
 
     const servicesTotal = services
       .filter((s) => s.selected)
       .reduce((sum, s) => sum + s.price, 0);
 
-    const netPayable = roomSubtotal + servicesTotal;
+    const totalAmount = roomSubtotal + servicesTotal;
     const adv = Number(advancePaid) || 0;
-    const balance = Math.max(0, netPayable - adv);
+    const balance = Math.max(0, totalAmount - adv);
 
     return {
       nights,
-      basePrice,
+      roomPrice,
       roomSubtotal,
       servicesTotal,
-      netPayable,
+      totalAmount,
       balance,
     };
-  }, [checkIn, checkOut, selectedRoom, services, advancePaid]);
+  }, [checkIn, checkOut, selectedRoom, customAmount, services, advancePaid]);
 
-  const toggleService = (id: string) => {
-    setServices((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, selected: !s.selected } : s))
-    );
+  // Add Service Handler
+  const handleAddNewService = () => {
+    if (!newServiceName.trim() || !newServicePrice.trim()) return;
+    const newSrv: ServiceAddon = {
+      id: `srv-${Date.now()}`,
+      name: newServiceName.trim(),
+      price: Number(newServicePrice) || 0,
+      selected: true,
+    };
+    setServices((prev) => [...prev, newSrv]);
+    setNewServiceName('');
+    setNewServicePrice('');
+    setShowAddServiceModal(false);
   };
 
-  // Check if currently selected room is occupied for chosen dates
-  const isSelectedRoomOccupied = Boolean(
-    selectedRoom &&
-      availableRooms.length > 0 &&
-      !availableRooms.some((r) => r.id === selectedRoom.id)
-  );
-
+  // Submit Reservation Handler
   const handleBookingSubmit = async () => {
-    // Resolve guest details with friendly defaults if user skipped sections
-    const finalGuestName = guestName.trim() || 'Walk-in Guest';
-    const finalGuestPhone =
-      guestPhone.trim() && guestPhone.trim() !== '+91'
-        ? guestPhone.trim()
-        : '+91 9823012345';
+    const finalGuestName = guestName.trim() || 'Guest';
+    const finalGuestPhone = guestPhone.trim() || '+91 9876543210';
 
-    // Check if room is already booked for these dates
-    if (isSelectedRoomOccupied && selectedRoom) {
-      setConflictError(
-        `Room ${selectedRoom.roomNumber} is already booked for the selected stay dates (${checkIn} to ${checkOut}). Double booking is blocked. Please choose an available room or change your dates.`
-      );
-      return;
-    }
-
-    // Ensure a room is selected
-    const activeRoom = selectedRoom || (availableRooms.length > 0 ? availableRooms[0] : null);
-    if (!activeRoom?.id) {
-      setFormError('Please select or assign an available room for these dates');
+    if (!selectedRoom?.id) {
+      setFormError('Please select a room for the reservation');
       return;
     }
 
@@ -288,14 +275,14 @@ export const AddReservationScreen: React.FC<AddReservationScreenProps> = ({
         passportNumber: passportNumber.trim() || undefined,
         dateOfBirth: dateOfBirth.trim() || undefined,
         hostName: hostName.trim() || undefined,
-        roomId: activeRoom.id,
+        roomId: selectedRoom.id,
         checkIn: checkInIso,
         checkOut: checkOutIso,
         checkInTime,
         checkOutTime,
         adults,
         children,
-        totalAmount: calculations.netPayable,
+        totalAmount: calculations.totalAmount,
         advancePaid: Number(advancePaid) || 0,
         notes: notes.trim() || undefined,
         status: 'Confirmed',
@@ -317,721 +304,563 @@ export const AddReservationScreen: React.FC<AddReservationScreenProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* 1. Royal Blue Header */}
-      <View style={styles.blueHeader}>
+      {/* 1. Solid Blue Header */}
+      <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.7}>
-          <Text style={styles.backBtnText}>←</Text>
+          <Text style={styles.backArrow}>←</Text>
         </TouchableOpacity>
-
-        <View style={styles.headerTitleCol}>
-          <Text style={styles.headerTitle}>Add Reservation</Text>
-          <Text style={styles.headerSubtitle}>
-            The Royal Maratha Resort • Pune Front Desk
-          </Text>
-        </View>
-
-        <View style={styles.gCalBadge}>
-          <Text style={styles.gCalBadgeText}>📅 G-CAL</Text>
-        </View>
+        <Text style={styles.headerTitle}>Add Reservation / Booking</Text>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Success Confirmation Toast */}
+      {/* Main Form Scroll View */}
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        {/* Success Modal Card */}
         {successData ? (
-          <View style={styles.successToast}>
-            <View style={styles.successIconCircle}>
-              <Text style={styles.successIconText}>✓</Text>
-            </View>
-            <Text style={styles.successTitle}>[201 CREATED] Reservation Booked!</Text>
+          <View style={styles.successCard}>
+            <Text style={styles.successIcon}>🎉</Text>
+            <Text style={styles.successTitle}>Booking Confirmed!</Text>
             <Text style={styles.successSub}>
-              PostgreSQL row locked & synced to Google Calendar.
+              Reservation for <Text style={{ fontWeight: '800' }}>{guestName || 'Guest'}</Text> has been created in PostgreSQL backend.
             </Text>
 
-            <View style={styles.successSummaryBox}>
-              <Text style={styles.successSummaryRow}>
-                <Text style={styles.successLabel}>Guest: </Text>
-                {successData.guest?.name || guestName}
-              </Text>
-              <Text style={styles.successSummaryRow}>
-                <Text style={styles.successLabel}>Room: </Text>
-                {selectedRoom?.roomNumber} ({selectedRoom?.roomCategory?.name})
-              </Text>
-              <Text style={styles.successSummaryRow}>
-                <Text style={styles.successLabel}>Dates: </Text>
-                {checkIn} to {checkOut} ({calculations.nights} Nights)
-              </Text>
-              <Text style={styles.successSummaryRow}>
-                <Text style={styles.successLabel}>Total Folio: </Text>
-                ₹{Number(successData.totalAmount).toLocaleString('en-IN')} (Advance: ₹{advancePaid})
-              </Text>
-              <Text style={styles.successSummaryRow}>
-                <Text style={styles.successLabel}>Balance Due: </Text>
-                ₹{calculations.balance.toLocaleString('en-IN')}
-              </Text>
-            </View>
-
-            <View style={styles.successBtnRow}>
-              {/* WhatsApp Share Button */}
-              <TouchableOpacity
-                style={styles.whatsappBtn}
-                onPress={() => {
-                  const phone = successData.guest?.phone || guestPhone;
-                  const name = successData.guest?.name || guestName;
-                  const roomNum = selectedRoom?.roomNumber || '101';
-                  const hotelName = selectedRoom?.roomCategory?.property?.name || 'Simply Booking Hotel';
-                  const calendarLink = successData.calendarLink;
-
-                  const total = successData.totalAmount || calculations.netPayable;
-                  const pending = calculations.balance;
-                  const currencySymbol = selectedRoom?.roomCategory?.property?.currency === 'USD' ? '$' : '₹';
-
-                  const message = `Hello ${name},\n\n` +
-                    `Your booking at *${hotelName}* is confirmed! 🎉\n\n` +
-                    `🏨 *Room:* Room ${roomNum}\n` +
-                    `📅 *Check-in:* ${checkIn}\n` +
-                    `📅 *Check-out:* ${checkOut}\n` +
-                    `💰 *Total Amount:* ${currencySymbol}${Number(total).toLocaleString('en-IN')}\n` +
-                    `💳 *Pending Amount:* ${currencySymbol}${Number(pending).toLocaleString('en-IN')}\n\n` +
-                    (calendarLink ? `📅 *Google Calendar Link:* ${calendarLink}\n\n` : '') +
-                    `Thank you for choosing Simply Booking. Have a wonderful stay! 🌿`;
-
-                  // Format phone number: strip spaces, non-numeric characters (keep plus sign)
-                  const cleanPhone = phone.replace(/[^\d+]/g, '');
-                  const url = `whatsapp://send?text=${encodeURIComponent(message)}&phone=${cleanPhone}`;
-                  
-                  Linking.canOpenURL(url)
-                    .then((supported) => {
-                      if (supported) {
-                        return Linking.openURL(url);
-                      } else {
-                        // Fallback to web link
-                        const webUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}&phone=${cleanPhone}`;
-                        return Linking.openURL(webUrl);
-                      }
-                    })
-                    .catch((err) => {
-                      Alert.alert('Error', 'Unable to open WhatsApp.');
-                    });
-                }}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.whatsappBtnText}>💬 Share on WhatsApp</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.returnBtn}
-                onPress={() => onBookingSuccess(successData.id, checkIn)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.returnBtnText}>View on Calendar Matrix ➔</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.calOpenBtn}
-                onPress={() => Linking.openURL('https://calendar.google.com')}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.calOpenBtnText}>View in Google Calendar ↗</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : null}
-
-        {/* 409 Concurrency Error Toast */}
-        {conflictError ? (
-          <View style={styles.conflictToast}>
-            <Text style={styles.conflictTitle}>⚠️ [409 CONFLICT] Room Collision</Text>
-            <Text style={styles.conflictText}>{conflictError}</Text>
             <TouchableOpacity
-              style={styles.conflictChangeRoomBtn}
-              onPress={() => setShowRoomPicker(true)}
+              style={styles.whatsappBtn}
+              onPress={() => {
+                sendWhatsAppConfirmation({
+                  guestName: guestName || 'Guest',
+                  guestPhone: guestPhone || '',
+                  roomName: selectedRoom?.name || selectedRoom?.roomNumber || 'Room',
+                  checkIn: formatIsoToDdMmYyyy(checkIn),
+                  checkOut: formatIsoToDdMmYyyy(checkOut),
+                  totalAmount: calculations.totalAmount,
+                  advancePaid: Number(advancePaid) || 0,
+                  balanceAmount: calculations.balance,
+                  bookingId: successData?.bookingId || successData?.id,
+                });
+                if (successData?.id) {
+                  ApiClient.sendWhatsAppNotification(successData.id).catch(() => {});
+                }
+              }}
+              activeOpacity={0.8}
             >
-              <Text style={styles.conflictChangeRoomBtnText}>Assign Different Room</Text>
+              <Text style={styles.whatsappBtnText}>💬 Send WhatsApp Confirmation</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.doneBtn}
+              onPress={() => onBookingSuccess(successData.id, checkIn)}
+            >
+              <Text style={styles.doneBtnText}>View Bookings List</Text>
             </TouchableOpacity>
           </View>
-        ) : null}
-
-        {/* General Error Banner */}
-        {formError ? (
-          <View style={styles.formErrorBanner}>
-            <Text style={styles.formErrorText}>⚠️ {formError}</Text>
-          </View>
-        ) : null}
-
-        {!successData ? (
+        ) : (
           <>
-            {/* Section 1: Stay Dates & Times */}
-            <View style={styles.sectionCard}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionHeading}>1. Stay Dates & Timings</Text>
+            {/* Error Banners */}
+            {conflictError && (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorText}>⚠️ {conflictError}</Text>
+              </View>
+            )}
+            {formError && (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorText}>⚠️ {formError}</Text>
+              </View>
+            )}
+
+            {/* TOP ROW 1: Check in * & Check out * */}
+            <View style={styles.twoColRow}>
+              <View style={styles.colHalf}>
+                <Text style={styles.fieldLabel}>Check in *</Text>
                 <TouchableOpacity
-                  style={styles.headerGCalPillBtn}
+                  style={styles.pickerBox}
                   onPress={() => setShowCalendarModal(true)}
-                  activeOpacity={0.7}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.headerGCalPillIcon}>📅</Text>
-                  <Text style={styles.headerGCalPillText}>Interactive Calendar</Text>
+                  <Text style={styles.pickerText}>{formatIsoToDdMmYyyy(checkIn)}</Text>
+                  <Text style={styles.pickerIcon}>📅</Text>
                 </TouchableOpacity>
               </View>
 
-              {/* Row 1: Interactive Date Selector Cards */}
-              <View style={styles.fieldRow}>
+              <View style={styles.colHalf}>
+                <Text style={styles.fieldLabel}>Check out *</Text>
                 <TouchableOpacity
-                  style={[styles.fieldCol, styles.dateTouchCard]}
+                  style={styles.pickerBox}
                   onPress={() => setShowCalendarModal(true)}
-                  activeOpacity={0.7}
+                  activeOpacity={0.8}
                 >
-                  <View style={styles.dateCardHeader}>
-                    <Text style={styles.fieldLabel}>Check-In Date *</Text>
-                    <View style={styles.inTagMini}>
-                      <Text style={styles.inTagMiniText}>CHECK-IN</Text>
-                    </View>
-                  </View>
-                  <View style={styles.dateValRow}>
-                    <Text style={styles.dateCardIcon}>📅</Text>
-                    <Text style={styles.dateCardValueText}>{formatDateDisplay(checkIn)}</Text>
-                  </View>
-                  <Text style={styles.dateTapHint}>Tap to change on calendar ➔</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.fieldCol, styles.dateTouchCard]}
-                  onPress={() => setShowCalendarModal(true)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.dateCardHeader}>
-                    <Text style={styles.fieldLabel}>Check-Out Date *</Text>
-                    <View style={styles.stayNightsTag}>
-                      <Text style={styles.stayNightsTagText}>{calculations.nights}N STAY</Text>
-                    </View>
-                  </View>
-                  <View style={styles.dateValRow}>
-                    <Text style={styles.dateCardIcon}>📅</Text>
-                    <Text style={styles.dateCardValueText}>{formatDateDisplay(checkOut)}</Text>
-                  </View>
-                  <Text style={styles.dateTapHint}>Tap to change on calendar ➔</Text>
+                  <Text style={styles.pickerText}>{formatIsoToDdMmYyyy(checkOut)}</Text>
+                  <Text style={styles.pickerIcon}>📅</Text>
                 </TouchableOpacity>
               </View>
+            </View>
 
-              {/* Google Calendar Interactive Dashboard Launcher Banner */}
-              <TouchableOpacity
-                style={styles.gCalDashboardBanner}
-                onPress={() => setShowCalendarModal(true)}
-                activeOpacity={0.85}
-              >
-                <View style={styles.gCalBannerIconBox}>
-                  <Text style={styles.gCalBannerIcon}>🗓️</Text>
-                </View>
-                <View style={styles.gCalBannerTextCol}>
-                  <View style={styles.gCalBannerTitleRow}>
-                    <Text style={styles.gCalBannerTitle}>Google Calendar Stay Grid</Text>
-                    <View style={styles.liveSyncPill}>
-                      <View style={styles.liveSyncDot} />
-                      <Text style={styles.liveSyncText}>SYNC</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.gCalBannerSub}>
-                    View month matrix, live booked dates & 1-tap select check-in / check-out
-                  </Text>
-                </View>
-                <Text style={styles.gCalBannerArrow}>›</Text>
-              </TouchableOpacity>
-
-              {/* Row 2: Times */}
-              <View style={styles.fieldRow}>
-                <View style={styles.fieldCol}>
-                  <Text style={styles.fieldLabel}>Check-In Time</Text>
+            {/* TOP ROW 2: Check-in Time & Check-out Time */}
+            <View style={styles.twoColRow}>
+              <View style={styles.colHalf}>
+                <Text style={styles.fieldLabel}>Check-in Time</Text>
+                <View style={styles.pickerBox}>
                   <TextInput
-                    style={styles.fieldInput}
+                    style={styles.inputInner}
                     value={checkInTime}
                     onChangeText={setCheckInTime}
                     placeholder="12:00 PM"
                   />
+                  <Text style={styles.pickerIcon}>🕒</Text>
                 </View>
-                <View style={styles.fieldCol}>
-                  <Text style={styles.fieldLabel}>Check-Out Time</Text>
+              </View>
+
+              <View style={styles.colHalf}>
+                <Text style={styles.fieldLabel}>Check-out Time</Text>
+                <View style={styles.pickerBox}>
                   <TextInput
-                    style={styles.fieldInput}
+                    style={styles.inputInner}
                     value={checkOutTime}
                     onChangeText={setCheckOutTime}
                     placeholder="11:00 AM"
                   />
-                </View>
-              </View>
-
-              {/* Row 3: Occupancy */}
-              <View style={styles.fieldRow}>
-                <View style={styles.fieldCol}>
-                  <Text style={styles.fieldLabel}>Adults *</Text>
-                  <View style={styles.counterRow}>
-                    <TouchableOpacity
-                      style={styles.counterBtn}
-                      onPress={() => setAdults((a) => Math.max(1, a - 1))}
-                    >
-                      <Text style={styles.counterBtnText}>-</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.counterValue}>{adults}</Text>
-                    <TouchableOpacity
-                      style={styles.counterBtn}
-                      onPress={() => setAdults((a) => a + 1)}
-                    >
-                      <Text style={styles.counterBtnText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View style={styles.fieldCol}>
-                  <Text style={styles.fieldLabel}>Children</Text>
-                  <View style={styles.counterRow}>
-                    <TouchableOpacity
-                      style={styles.counterBtn}
-                      onPress={() => setChildren((c) => Math.max(0, c - 1))}
-                    >
-                      <Text style={styles.counterBtnText}>-</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.counterValue}>{children}</Text>
-                    <TouchableOpacity
-                      style={styles.counterBtn}
-                      onPress={() => setChildren((c) => c + 1)}
-                    >
-                      <Text style={styles.counterBtnText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
+                  <Text style={styles.pickerIcon}>🕒</Text>
                 </View>
               </View>
             </View>
 
-            {/* Section 2: Room Assignment */}
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionHeading}>2. Room Assignment</Text>
-
-              {selectedRoom ? (
-                <View
-                  style={[
-                    styles.selectedRoomCard,
-                    isSelectedRoomOccupied && styles.selectedRoomCardOccupied,
-                  ]}
-                >
-                  <View style={styles.selectedRoomHeader}>
-                    <View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text
-                          style={[
-                            styles.selectedRoomNum,
-                            isSelectedRoomOccupied && styles.selectedRoomNumOccupied,
-                          ]}
-                        >
-                          Room {selectedRoom.roomNumber}
-                        </Text>
-                        {isSelectedRoomOccupied && (
-                          <View style={styles.occupiedBadge}>
-                            <Text style={styles.occupiedBadgeText}>🚫 ALREADY BOOKED</Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.selectedRoomCat}>
-                        {selectedRoom.roomCategory?.name || 'Standard'}
-                      </Text>
-                    </View>
-                    <Text
-                      style={[
-                        styles.selectedRoomRate,
-                        isSelectedRoomOccupied && styles.selectedRoomRateOccupied,
-                      ]}
-                    >
-                      ₹{Number(selectedRoom.roomCategory?.basePrice || 2500).toLocaleString('en-IN')}/night
-                    </Text>
-                  </View>
-
-                  {isSelectedRoomOccupied ? (
-                    <View style={styles.occupiedNoticeBox}>
-                      <Text style={styles.occupiedNoticeText}>
-                        ⚠️ Room {selectedRoom.roomNumber} is already reserved for {checkIn} to {checkOut}. Please select an available room.
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.occupiedChangeBtn}
-                        onPress={() => setShowRoomPicker(true)}
-                        activeOpacity={0.85}
-                      >
-                        <Text style={styles.occupiedChangeBtnText}>⚡ Assign Available Room Now</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.changeRoomLink}
-                      onPress={() => setShowRoomPicker(true)}
-                    >
-                      <Text style={styles.changeRoomLinkText}>Change Assigned Room ⇄</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ) : (
+            {/* TOP ROW 3: Adults * & Children */}
+            <View style={styles.twoColRow}>
+              <View style={styles.colHalf}>
+                <Text style={styles.fieldLabel}>Adults *</Text>
                 <TouchableOpacity
-                  style={styles.assignRoomButton}
+                  style={styles.pickerBox}
+                  onPress={() => setShowAdultsPicker(true)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.pickerText}>{adults}</Text>
+                  <Text style={styles.pickerIcon}>∨</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.colHalf}>
+                <Text style={styles.fieldLabel}>Children</Text>
+                <TouchableOpacity
+                  style={styles.pickerBox}
+                  onPress={() => setShowChildrenPicker(true)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.pickerText}>{children}</Text>
+                  <Text style={styles.pickerIcon}>∨</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* ROOM ASSIGNMENT CARD */}
+            <View style={styles.roomCardContainer}>
+              <View style={styles.minusBtnBox}>
+                <Text style={styles.minusBtnText}>-</Text>
+              </View>
+
+              {/* Room name * */}
+              <View style={{ marginTop: 4 }}>
+                <Text style={styles.fieldLabel}>Room name *</Text>
+                <TouchableOpacity
+                  style={[styles.pickerBox, styles.blueActiveBorder]}
                   onPress={() => setShowRoomPicker(true)}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.assignRoomButtonText}>+ Assign / Select Room</Text>
+                  <Text style={styles.pickerText} numberOfLines={1}>
+                    {selectedRoom
+                      ? selectedRoom.displayName || `${selectedRoom.categoryName} - Room ${selectedRoom.roomNumber}`
+                      : loadingRooms
+                      ? 'Loading created rooms...'
+                      : 'Select Created Room'}
+                  </Text>
+                  <Text style={styles.pickerIcon}>▼</Text>
                 </TouchableOpacity>
-              )}
+              </View>
+
+              {/* Amount(Incl. of taxes) */}
+              <View style={{ marginTop: 12 }}>
+                <Text style={styles.fieldLabel}>Amount(Incl. of taxes)</Text>
+                <TextInput
+                  style={styles.amountInput}
+                  keyboardType="numeric"
+                  placeholder={`${selectedRoom?.pricePerNight || 2500}`}
+                  value={customAmount}
+                  onChangeText={setCustomAmount}
+                />
+                <Text style={styles.totalAmountLabel}>
+                  Total Amount: ₹{calculations.totalAmount.toFixed(2)}
+                </Text>
+              </View>
             </View>
 
-            {/* Section 3: Guest Information */}
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionHeading}>3. Guest Details</Text>
+            {/* Outlined + Assign Another Room Button */}
+            <TouchableOpacity
+              style={styles.assignAnotherRoomBtn}
+              onPress={() => setShowRoomPicker(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.assignAnotherRoomBtnText}>+ Assign Another Room</Text>
+            </TouchableOpacity>
 
-              {/* Row 4: Name & Phone */}
-              <View style={styles.fieldRow}>
-                <View style={styles.fieldCol}>
+            {/* GUEST DETAILS SECTION */}
+            <View style={{ marginTop: 16 }}>
+              {/* Primary Guest Name * & Contact Number * */}
+              <View style={styles.twoColRow}>
+                <View style={styles.colHalf}>
                   <Text style={styles.fieldLabel}>Primary Guest Name *</Text>
                   <TextInput
-                    style={styles.fieldInput}
-                    placeholder="e.g. Rahul Patil"
+                    style={styles.textInput}
                     value={guestName}
                     onChangeText={setGuestName}
+                    placeholder="Enter guest name"
                   />
                 </View>
-                <View style={styles.fieldCol}>
+
+                <View style={styles.colHalf}>
                   <Text style={styles.fieldLabel}>Contact Number *</Text>
                   <TextInput
-                    style={styles.fieldInput}
-                    placeholder="+91 9876543210"
+                    style={styles.textInput}
                     keyboardType="phone-pad"
                     value={guestPhone}
                     onChangeText={setGuestPhone}
+                    placeholder="+91 9876543210"
                   />
                 </View>
               </View>
 
-              {/* Email */}
-              <View style={styles.fieldFull}>
-                <Text style={styles.fieldLabel}>E-mail Address (Optional)</Text>
+              {/* E-mail (optional) */}
+              <View style={styles.fullWidthField}>
+                <Text style={styles.fieldLabel}>E-mail (optional)</Text>
                 <TextInput
-                  style={styles.fieldInput}
-                  placeholder="rahul.patil@example.com"
+                  style={styles.textInput}
                   keyboardType="email-address"
+                  autoCapitalize="none"
                   value={guestEmail}
                   onChangeText={setGuestEmail}
+                  placeholder="Enter email address"
                 />
               </View>
 
-              {/* Row 5: Address & Pincode */}
-              <View style={styles.fieldRow}>
-                <View style={styles.fieldCol}>
-                  <Text style={styles.fieldLabel}>Address (Optional)</Text>
+              {/* Address (optional) & Pincode/Zipcode (optional) */}
+              <View style={styles.twoColRow}>
+                <View style={styles.colHalf}>
+                  <Text style={styles.fieldLabel}>Address (optional)</Text>
                   <TextInput
-                    style={styles.fieldInput}
-                    placeholder="Koregaon Park, Pune"
+                    style={styles.textInput}
                     value={address}
                     onChangeText={setAddress}
+                    placeholder="Street / City"
                   />
                 </View>
-                <View style={styles.fieldCol}>
-                  <Text style={styles.fieldLabel}>Pincode / Zipcode</Text>
+
+                <View style={styles.colHalf}>
+                  <Text style={styles.fieldLabel}>Pincode/Zipcode (optional)</Text>
                   <TextInput
-                    style={styles.fieldInput}
-                    placeholder="411001"
+                    style={styles.textInput}
                     keyboardType="numeric"
                     value={pincode}
                     onChangeText={setPincode}
+                    placeholder="411001"
                   />
                 </View>
               </View>
 
-              {/* Row 6: ID / Passport */}
-              <View style={styles.fieldRow}>
-                <View style={styles.fieldCol}>
-                  <Text style={styles.fieldLabel}>ID / Aadhaar (Optional)</Text>
+              {/* ID Number (optional) & Passport Number (optional) */}
+              <View style={styles.twoColRow}>
+                <View style={styles.colHalf}>
+                  <Text style={styles.fieldLabel}>ID Number (optional)</Text>
                   <TextInput
-                    style={styles.fieldInput}
-                    placeholder="XXXX-XXXX-XXXX"
+                    style={styles.textInput}
                     value={idNumber}
                     onChangeText={setIdNumber}
+                    placeholder="Aadhaar / Voter ID"
                   />
                 </View>
-                <View style={styles.fieldCol}>
-                  <Text style={styles.fieldLabel}>Passport No (Optional)</Text>
+
+                <View style={styles.colHalf}>
+                  <Text style={styles.fieldLabel}>Passport Number (optional)</Text>
                   <TextInput
-                    style={styles.fieldInput}
-                    placeholder="e.g. Z1234567"
+                    style={styles.textInput}
                     value={passportNumber}
                     onChangeText={setPassportNumber}
+                    placeholder="Passport No"
                   />
                 </View>
               </View>
 
-              {/* Row 7: DOB & Host */}
-              <View style={styles.fieldRow}>
-                <View style={styles.fieldCol}>
-                  <Text style={styles.fieldLabel}>Date of Birth</Text>
+              {/* Date of Birth (optional) */}
+              <View style={styles.fullWidthField}>
+                <Text style={styles.fieldLabel}>Date of Birth (optional)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={dateOfBirth}
+                  onChangeText={setDateOfBirth}
+                  placeholder="DD-MM-YYYY"
+                />
+              </View>
+
+              {/* Host Name (optional) & Host Phone (optional) */}
+              <View style={styles.twoColRow}>
+                <View style={styles.colHalf}>
+                  <Text style={styles.fieldLabel}>Host Name (optional)</Text>
                   <TextInput
-                    style={styles.fieldInput}
-                    placeholder="YYYY-MM-DD"
-                    value={dateOfBirth}
-                    onChangeText={setDateOfBirth}
-                  />
-                </View>
-                <View style={styles.fieldCol}>
-                  <Text style={styles.fieldLabel}>Host / Referrer</Text>
-                  <TextInput
-                    style={styles.fieldInput}
-                    placeholder="Front Desk Staff"
+                    style={styles.textInput}
                     value={hostName}
                     onChangeText={setHostName}
+                    placeholder="Host name"
                   />
                 </View>
-              </View>
-            </View>
 
-            {/* Section 4: Service Add-ons */}
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionHeading}>4. Ancillary Services & Add-ons</Text>
-              {services.map((srv) => (
-                <TouchableOpacity
-                  key={srv.id}
-                  style={[
-                    styles.serviceItemRow,
-                    srv.selected && styles.serviceItemRowActive,
-                  ]}
-                  onPress={() => toggleService(srv.id)}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.serviceCheckbox}>
-                    <Text style={styles.serviceCheckboxText}>
-                      {srv.selected ? '✓' : ''}
-                    </Text>
-                  </View>
-                  <View style={styles.serviceTextCol}>
-                    <Text style={styles.serviceName}>{srv.name}</Text>
-                    <Text style={styles.servicePrice}>+ ₹{srv.price}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Section 5: Financials & Balance */}
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionHeading}>5. Folio Financials</Text>
-
-              <View style={styles.financialRow}>
-                <Text style={styles.financialLabel}>
-                  Room Rate ({calculations.nights} Nights × ₹{calculations.basePrice})
-                </Text>
-                <Text style={styles.financialVal}>
-                  ₹{calculations.roomSubtotal.toLocaleString('en-IN')}
-                </Text>
-              </View>
-
-              {calculations.servicesTotal > 0 ? (
-                <View style={styles.financialRow}>
-                  <Text style={styles.financialLabel}>Add-on Services Total</Text>
-                  <Text style={styles.financialVal}>
-                    ₹{calculations.servicesTotal.toLocaleString('en-IN')}
-                  </Text>
-                </View>
-              ) : null}
-
-              <View style={styles.divider} />
-
-              <View style={styles.financialTotalRow}>
-                <Text style={styles.totalLabel}>Final Total Amount</Text>
-                <Text style={styles.totalValue}>
-                  ₹{calculations.netPayable.toLocaleString('en-IN')}
-                </Text>
-              </View>
-
-              {/* Advance Paid Input */}
-              <View style={styles.advanceRow}>
-                <View style={styles.advanceInputCol}>
-                  <Text style={styles.fieldLabel}>Advance Payment Collected (₹)</Text>
+                <View style={styles.colHalf}>
+                  <Text style={styles.fieldLabel}>Host Phone (optional)</Text>
                   <TextInput
-                    style={styles.advanceInput}
-                    keyboardType="numeric"
-                    value={advancePaid}
-                    onChangeText={setAdvancePaid}
-                    placeholder="0"
+                    style={styles.textInput}
+                    keyboardType="phone-pad"
+                    value={hostPhone}
+                    onChangeText={setHostPhone}
+                    placeholder="Host phone"
                   />
                 </View>
               </View>
 
-              {/* High Contrast Red Balance Text */}
-              <View style={styles.balanceContainer}>
-                <Text style={styles.balanceText}>
-                  Balance Due: ₹{calculations.balance.toLocaleString('en-IN')}
-                </Text>
-              </View>
-            </View>
+              {/* + Add service Button */}
+              <TouchableOpacity
+                style={styles.assignAnotherRoomBtn}
+                onPress={() => setShowAddServiceModal(true)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.assignAnotherRoomBtnText}>+ Add service</Text>
+              </TouchableOpacity>
 
-            {/* Section 6: Notes */}
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionHeading}>6. Front Desk Notes / Requests</Text>
-              <TextInput
-                style={styles.notesInput}
-                multiline
-                numberOfLines={3}
-                placeholder="e.g. Guest arriving late night, requested quiet room on garden side..."
-                value={notes}
-                onChangeText={setNotes}
-              />
+              {/* Additional Services List if any selected */}
+              {services.some((s) => s.selected) && (
+                <View style={styles.servicesBox}>
+                  {services
+                    .filter((s) => s.selected)
+                    .map((s) => (
+                      <View key={s.id} style={styles.serviceItemRow}>
+                        <Text style={styles.serviceItemName}>✓ {s.name}</Text>
+                        <Text style={styles.serviceItemPrice}>+₹{s.price}</Text>
+                      </View>
+                    ))}
+                </View>
+              )}
+
+              {/* Section Header: Additional Guests */}
+              <Text style={styles.sectionHeaderTitle}>Additional Guests</Text>
+
+              {/* Advance Paid */}
+              <View style={styles.fullWidthField}>
+                <Text style={styles.fieldLabel}>Advance Paid (₹)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  keyboardType="numeric"
+                  value={advancePaid}
+                  onChangeText={setAdvancePaid}
+                  placeholder="0"
+                />
+              </View>
+
+              {/* FINANCIAL BREAKDOWN CARD (Showing Balance Due) */}
+              <View style={styles.financialSummaryCard}>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Total Amount:</Text>
+                  <Text style={styles.summaryValue}>₹{calculations.totalAmount.toFixed(2)}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Advance Paid:</Text>
+                  <Text style={styles.summaryValue}>₹{(Number(advancePaid) || 0).toFixed(2)}</Text>
+                </View>
+                <View style={[styles.summaryRow, styles.balanceRow]}>
+                  <Text style={styles.balanceLabel}>Balance Due:</Text>
+                  <Text style={styles.balanceValue}>₹{calculations.balance.toFixed(2)}</Text>
+                </View>
+              </View>
+
+              {/* Notes / Special Requests (optional) */}
+              <View style={styles.fullWidthField}>
+                <Text style={styles.fieldLabel}>Notes / Special Requests (optional)</Text>
+                <TextInput
+                  style={[styles.textInput, styles.notesInput]}
+                  multiline
+                  numberOfLines={3}
+                  value={notes}
+                  onChangeText={setNotes}
+                  placeholder="Enter any guest notes, special requests, or instructions..."
+                />
+              </View>
+
+              {/* Save / Create Reservation Button */}
+              <TouchableOpacity
+                style={[styles.saveBookingBtn, submitting && styles.btnDisabled]}
+                onPress={handleBookingSubmit}
+                disabled={submitting}
+                activeOpacity={0.85}
+              >
+                {submitting ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveBookingBtnText}>Create Reservation / Booking</Text>
+                )}
+              </TouchableOpacity>
             </View>
           </>
-        ) : null}
+        )}
       </ScrollView>
 
-      {/* Bottom Sticky Submit Button */}
-      {!successData ? (
-        <View style={styles.bottomBar}>
-          <View style={styles.bottomPriceCol}>
-            <Text style={styles.bottomLabel}>Total Folio</Text>
-            <Text style={styles.bottomAmount}>
-              ₹{calculations.netPayable.toLocaleString('en-IN')}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.submitBtn}
-            onPress={handleBookingSubmit}
-            disabled={submitting}
-            activeOpacity={0.85}
-          >
-            {submitting ? (
-              <ActivityIndicator color="#ffffff" size="small" />
-            ) : (
-              <Text style={styles.submitBtnText}>Confirm & Book Reservation ➔</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      ) : null}
-
-      {/* Room Picker Modal */}
-      <Modal
-        visible={showRoomPicker}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowRoomPicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.roomPickerContent}>
-            <View style={styles.roomPickerHeader}>
-              <Text style={styles.roomPickerTitle}>Select Available Room</Text>
-              <TouchableOpacity
-                onPress={() => setShowRoomPicker(false)}
-                style={styles.modalCloseBtn}
-              >
-                <Text style={styles.modalCloseText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            {loadingRooms ? (
-              <ActivityIndicator size="large" color="#1e40af" style={{ marginVertical: 20 }} />
-            ) : availableRooms.length === 0 ? (
-              <Text style={styles.noRoomsText}>
-                No rooms available for the selected dates.
-              </Text>
-            ) : (
-              <ScrollView style={styles.roomListScroll}>
-                {availableRooms.map((r) => (
-                  <TouchableOpacity
-                    key={r.id}
-                    style={[
-                      styles.roomPickOption,
-                      selectedRoom?.id === r.id && styles.roomPickOptionActive,
-                    ]}
-                    onPress={() => {
-                      setSelectedRoom(r);
-                      setShowRoomPicker(false);
-                    }}
-                  >
-                    <View style={styles.roomPickNumBadge}>
-                      <Text style={styles.roomPickNumText}>{r.roomNumber}</Text>
-                    </View>
-                    <View style={styles.roomPickInfoCol}>
-                      <Text style={styles.roomPickCatName}>
-                        {r.roomCategory?.name || 'Standard'}
-                      </Text>
-                      <Text style={styles.roomPickStatus}>Status: {r.status}</Text>
-                    </View>
-                    <Text style={styles.roomPickPrice}>
-                      ₹{Number(r.roomCategory?.basePrice || 2500).toLocaleString('en-IN')}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
-          </View>
-        </View>
-      </Modal>
-
-      {/* 409 Double-Booking & Room Conflict Popup Modal */}
-      <Modal
-        visible={!!conflictError}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setConflictError(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.conflictModalCard}>
-            <View style={styles.conflictModalIconCircle}>
-              <Text style={styles.conflictModalIconText}>🚫</Text>
-            </View>
-
-            <Text style={styles.conflictModalTitle}>Room Already Booked</Text>
-            <Text style={styles.conflictModalSubtitle}>Double Booking Prevented</Text>
-
-            <View style={styles.conflictModalBodyBox}>
-              <Text style={styles.conflictModalBodyText}>{conflictError}</Text>
-            </View>
-
-            <View style={styles.conflictModalActions}>
-              <TouchableOpacity
-                style={styles.conflictModalPrimaryBtn}
-                onPress={() => {
-                  setConflictError(null);
-                  setShowRoomPicker(true);
-                }}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.conflictModalPrimaryBtnText}>⚡ Assign Available Room</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.conflictModalSecondaryBtn}
-                onPress={() => {
-                  setConflictError(null);
-                  setShowCalendarModal(true);
-                }}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.conflictModalSecondaryBtnText}>📅 Change Stay Dates</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.conflictModalDismissBtn}
-                onPress={() => setConflictError(null)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.conflictModalDismissBtnText}>Dismiss</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Google Calendar Interactive Date Picker Dashboard Modal */}
+      {/* Calendar Date Picker Modal */}
       <GoogleCalendarDatePickerModal
         visible={showCalendarModal}
         checkIn={checkIn}
         checkOut={checkOut}
         existingReservations={existingReservations}
         onClose={() => setShowCalendarModal(false)}
-        onApply={(newIn, newOut) => {
+        onApply={(newIn: string, newOut: string) => {
           setCheckIn(newIn);
           setCheckOut(newOut);
           setShowCalendarModal(false);
         }}
       />
+
+      {/* Room Picker Modal (All Created Rooms) */}
+      <Modal
+        visible={showRoomPicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowRoomPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Created Room</Text>
+              <TouchableOpacity onPress={() => setShowRoomPicker(false)}>
+                <Text style={styles.modalCloseIcon}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 350 }}>
+              {allRooms.map((rm) => (
+                <TouchableOpacity
+                  key={rm.id}
+                  style={[
+                    styles.modalOptionRow,
+                    selectedRoom?.id === rm.id && styles.modalOptionSelected,
+                  ]}
+                  onPress={() => {
+                    setSelectedRoom(rm);
+                    setShowRoomPicker(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.modalOptionText,
+                      selectedRoom?.id === rm.id && styles.modalOptionTextSelected,
+                    ]}
+                  >
+                    {rm.displayName || `${rm.categoryName} - Room ${rm.roomNumber}`}
+                  </Text>
+                  <Text style={styles.roomPriceTag}>₹{rm.pricePerNight}/night</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Adults Picker Modal */}
+      <Modal
+        visible={showAdultsPicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowAdultsPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Select Adults Count</Text>
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
+              <TouchableOpacity
+                key={num}
+                style={styles.modalOptionRow}
+                onPress={() => {
+                  setAdults(num);
+                  setShowAdultsPicker(false);
+                }}
+              >
+                <Text style={styles.modalOptionText}>{num} Adult{num > 1 ? 's' : ''}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Children Picker Modal */}
+      <Modal
+        visible={showChildrenPicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowChildrenPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Select Children Count</Text>
+            {[0, 1, 2, 3, 4, 5].map((num) => (
+              <TouchableOpacity
+                key={num}
+                style={styles.modalOptionRow}
+                onPress={() => {
+                  setChildren(num);
+                  setShowChildrenPicker(false);
+                }}
+              >
+                <Text style={styles.modalOptionText}>{num} Child{num !== 1 ? 'ren' : ''}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+
+
+
+      {/* Add Service Modal */}
+      <Modal
+        visible={showAddServiceModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowAddServiceModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Custom Service</Text>
+              <TouchableOpacity onPress={() => setShowAddServiceModal(false)}>
+                <Text style={styles.modalCloseIcon}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.fieldLabel}>Service Name</Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="e.g. Extra Bed"
+              value={newServiceName}
+              onChangeText={setNewServiceName}
+            />
+
+            <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Price (₹)</Text>
+            <TextInput
+              style={styles.textInput}
+              keyboardType="numeric"
+              placeholder="500"
+              value={newServicePrice}
+              onChangeText={setNewServicePrice}
+            />
+
+            <TouchableOpacity
+              style={[styles.saveBookingBtn, { marginTop: 16 }]}
+              onPress={handleAddNewService}
+            >
+              <Text style={styles.saveBookingBtnText}>Add Service</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1039,872 +868,375 @@ export const AddReservationScreen: React.FC<AddReservationScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#F3F4F6',
   },
-  // Section Header with G-Cal pill button
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  headerGCalPillBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#eff6ff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-  },
-  headerGCalPillIcon: {
-    fontSize: 11,
-    marginRight: 4,
-  },
-  headerGCalPillText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#1d4ed8',
-  },
-  // Interactive Date Touch Cards
-  dateTouchCard: {
-    backgroundColor: '#f8fafc',
-    borderWidth: 1.5,
-    borderColor: '#cbd5e1',
-    borderRadius: 10,
-    padding: 10,
-  },
-  dateCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  inTagMini: {
-    backgroundColor: '#dbeafe',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  inTagMiniText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#1e40af',
-  },
-  stayNightsTag: {
-    backgroundColor: '#d1fae5',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  stayNightsTagText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#065f46',
-  },
-  dateValRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 2,
-  },
-  dateCardIcon: {
-    fontSize: 13,
-    marginRight: 6,
-  },
-  dateCardValueText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#0f172a',
-    flexShrink: 1,
-  },
-  dateTapHint: {
-    fontSize: 10,
-    color: '#2563eb',
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  // Google Calendar Dashboard Banner
-  gCalDashboardBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0f172a',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-    ...shadows.card,
-  },
-  gCalBannerIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#1e293b',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: '#3b82f6',
-  },
-  gCalBannerIcon: {
-    fontSize: 16,
-  },
-  gCalBannerTextCol: {
-    flex: 1,
-  },
-  gCalBannerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  gCalBannerTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  liveSyncPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-    borderWidth: 0.5,
-    borderColor: '#10b981',
-  },
-  liveSyncDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#10b981',
-    marginRight: 3,
-  },
-  liveSyncText: {
-    fontSize: 8,
-    fontWeight: '800',
-    color: '#34d399',
-  },
-  gCalBannerSub: {
-    fontSize: 10,
-    color: '#94a3b8',
-    marginTop: 1,
-  },
-  gCalBannerArrow: {
-    fontSize: 18,
-    color: '#60a5fa',
-    fontWeight: 'bold',
-    marginLeft: 6,
-  },
-  // Royal Blue Header
-  blueHeader: {
-    backgroundColor: '#0f172a',
+  header: {
+    backgroundColor: '#0066FF',
+    paddingTop: Platform.OS === 'ios' ? 48 : 16,
+    paddingBottom: 16,
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 40 : 50,
-    paddingBottom: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderColor: '#1e293b',
+    gap: 12,
+    ...shadows.card,
   },
   backBtn: {
     width: 36,
     height: 36,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
-  backBtnText: {
+  backArrow: {
     fontSize: 20,
-    color: '#ffffff',
-    fontWeight: '900',
-  },
-  headerTitleCol: {
-    flex: 1,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#ffffff',
-    letterSpacing: 0.3,
-  },
-  headerSubtitle: {
-    fontSize: 11,
-    color: '#93c5fd',
-    fontWeight: '600',
-    marginTop: 1,
-  },
-  gCalBadge: {
-    backgroundColor: '#7c3aed',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  gCalBadgeText: {
-    color: '#ffffff',
-    fontSize: 10,
+    fontSize: 18,
     fontWeight: '800',
+    color: '#FFFFFF',
   },
   scrollContent: {
-    padding: 14,
-    paddingBottom: 100,
+    padding: 16,
+    paddingBottom: 40,
   },
-  // Section Cards
-  sectionCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+  errorBanner: {
+    backgroundColor: '#FEF2F2',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    padding: 14,
-    marginBottom: 12,
-    ...shadows.card,
+    borderColor: '#FECACA',
   },
-  sectionHeading: {
+  errorText: {
     fontSize: 13,
-    fontWeight: '900',
-    color: '#0f172a',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: '#EF4444',
+    fontWeight: '600',
+  },
+  twoColRow: {
+    flexDirection: 'row',
+    gap: 12,
     marginBottom: 12,
   },
-  fieldRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 10,
-  },
-  fieldCol: {
+  colHalf: {
     flex: 1,
   },
-  fieldFull: {
-    marginBottom: 10,
+  colLarge: {
+    flex: 2.2,
+  },
+  colSmall: {
+    flex: 1,
+  },
+  fullWidthField: {
+    marginBottom: 12,
   },
   fieldLabel: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#475569',
+    color: '#4B5563',
     marginBottom: 4,
   },
-  fieldInput: {
+  pickerBox: {
+    backgroundColor: '#F9FAFB',
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 7,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 13,
-    color: '#0f172a',
-    backgroundColor: '#f8fafc',
-  },
-  // Counter Controls
-  counterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 7,
-    backgroundColor: '#f8fafc',
-    overflow: 'hidden',
-  },
-  counterBtn: {
-    width: 38,
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#e2e8f0',
-  },
-  counterBtnText: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0f172a',
-  },
-  counterValue: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  // Room Selection Card
-  selectedRoomCard: {
-    backgroundColor: '#eff6ff',
-    borderWidth: 1.5,
-    borderColor: '#3b82f6',
+    borderColor: '#E5E7EB',
     borderRadius: 8,
-    padding: 12,
-  },
-  selectedRoomHeader: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
   },
-  selectedRoomNum: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#1e40af',
-  },
-  selectedRoomCat: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#3b82f6',
-  },
-  selectedRoomRate: {
+  pickerText: {
     fontSize: 14,
-    fontWeight: '900',
-    color: '#1e40af',
+    fontWeight: '600',
+    color: '#1F2937',
   },
-  changeRoomLink: {
-    alignSelf: 'flex-start',
-    marginTop: 4,
+  pickerIcon: {
+    fontSize: 14,
+    color: '#9CA3AF',
   },
-  changeRoomLinkText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#2563eb',
+  inputInner: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    padding: 0,
   },
-  assignRoomButton: {
-    borderWidth: 1.5,
-    borderColor: '#2563eb',
-    borderStyle: 'dashed',
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: '#eff6ff',
-  },
-  assignRoomButtonText: {
-    color: '#1e40af',
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  // Ancillary Services
-  serviceItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
+  textInput: {
+    backgroundColor: '#F9FAFB',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 7,
-    marginBottom: 8,
-    backgroundColor: '#f8fafc',
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#1F2937',
   },
-  serviceItemRowActive: {
-    borderColor: '#10b981',
-    backgroundColor: '#ecfdf5',
+  notesInput: {
+    height: 80,
+    textAlignVertical: 'top',
   },
-  serviceCheckbox: {
+  roomCardContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    position: 'relative',
+    ...shadows.card,
+  },
+  minusBtnBox: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
     width: 22,
     height: 22,
     borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: '#94a3b8',
+    borderWidth: 1,
+    borderColor: '#9CA3AF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
-    backgroundColor: '#ffffff',
+    zIndex: 2,
   },
-  serviceCheckboxText: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#10b981',
+  minusBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#4B5563',
   },
-  serviceTextCol: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  blueActiveBorder: {
+    borderColor: '#0066FF',
+    borderWidth: 1.5,
+    backgroundColor: '#FFFFFF',
   },
-  serviceName: {
+  amountInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#1F2937',
+    marginTop: 2,
+  },
+  totalAmountLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#6B7280',
+    alignSelf: 'flex-end',
+    marginTop: 4,
   },
-  servicePrice: {
-    fontSize: 12,
+  assignAnotherRoomBtn: {
+    borderWidth: 1,
+    borderColor: '#0066FF',
+    borderRadius: 24,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  assignAnotherRoomBtnText: {
+    fontSize: 14,
     fontWeight: '800',
-    color: '#059669',
+    color: '#0066FF',
   },
-  // Financials
-  financialRow: {
+  sectionHeaderTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginTop: 16,
+    marginBottom: 12,
+  },
+
+  // Financial Summary Card (Showing Balance Due)
+  financialSummaryCard: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    marginBottom: 16,
+    marginTop: 4,
+  },
+  summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  financialLabel: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  financialVal: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#e2e8f0',
-    marginVertical: 8,
-  },
-  financialTotalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  totalLabel: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  totalValue: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#0f172a',
-  },
-  advanceRow: {
-    marginBottom: 8,
-  },
-  advanceInputCol: {
-    flex: 1,
-  },
-  advanceInput: {
-    borderWidth: 1.5,
-    borderColor: '#cbd5e1',
-    borderRadius: 7,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0f172a',
-    backgroundColor: '#f8fafc',
-  },
-  balanceContainer: {
-    backgroundColor: '#fef2f2',
-    borderWidth: 1.5,
-    borderColor: '#fecaca',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  balanceText: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#dc2626',
-    letterSpacing: 0.3,
-  },
-  notesInput: {
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 7,
-    padding: 10,
-    fontSize: 12,
-    color: '#0f172a',
-    backgroundColor: '#f8fafc',
-    textAlignVertical: 'top',
-  },
-  // Bottom Bar CTA
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#ffffff',
-    borderTopWidth: 1,
-    borderColor: '#e2e8f0',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    ...shadows.modal,
-  },
-  bottomPriceCol: {
-    flex: 0.4,
-  },
-  bottomLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#64748b',
-    textTransform: 'uppercase',
-  },
-  bottomAmount: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0f172a',
-  },
-  submitBtn: {
-    flex: 0.6,
-    backgroundColor: '#1e40af',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  submitBtnText: {
-    color: '#ffffff',
+  summaryLabel: {
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '600',
+    color: '#92400E',
   },
-  // Modal Common
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  roomPickerContent: {
-    width: '100%',
-    maxWidth: 420,
-    maxHeight: '80%',
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 16,
-    ...shadows.modal,
-  },
-  roomPickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  roomPickerTitle: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#0f172a',
-  },
-  modalCloseBtn: {
-    padding: 4,
-  },
-  modalCloseText: {
-    fontSize: 18,
-    color: '#64748b',
+  summaryValue: {
+    fontSize: 14,
     fontWeight: '700',
+    color: '#78350F',
   },
-  roomListScroll: {
+  balanceRow: {
     marginTop: 6,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#FCD34D',
+    marginBottom: 0,
   },
-  roomPickOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: '#f8fafc',
-  },
-  roomPickOptionActive: {
-    borderColor: '#2563eb',
-    backgroundColor: '#eff6ff',
-  },
-  roomPickNumBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: '#0f172a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  roomPickNumText: {
-    fontSize: 14,
+  balanceLabel: {
+    fontSize: 15,
     fontWeight: '900',
-    color: '#ffffff',
+    color: '#B45309',
   },
-  roomPickInfoCol: {
-    flex: 1,
-  },
-  roomPickCatName: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  roomPickStatus: {
-    fontSize: 10,
-    color: '#64748b',
-    marginTop: 1,
-  },
-  roomPickPrice: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#1e40af',
-  },
-  noRoomsText: {
-    fontSize: 13,
-    color: '#64748b',
-    textAlign: 'center',
-    marginVertical: 20,
-  },
-  // Toasts
-  successToast: {
-    backgroundColor: '#10b981',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 14,
-    ...shadows.cardHover,
-  },
-  successIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  successIconText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  successTitle: {
+  balanceValue: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#ffffff',
-    marginBottom: 2,
+    color: '#B45309',
   },
-  successSub: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 10,
+
+  saveBookingBtn: {
+    backgroundColor: '#0066FF',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 16,
+    ...shadows.card,
   },
-  successSummaryBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  saveBookingBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  btnDisabled: {
+    opacity: 0.6,
+  },
+  servicesBox: {
+    backgroundColor: '#EFF6FF',
     borderRadius: 8,
-    padding: 10,
-    gap: 4,
+    padding: 12,
     marginBottom: 12,
   },
-  successSummaryRow: {
-    fontSize: 12,
-    color: '#ffffff',
+  serviceItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
-  successLabel: {
+  serviceItemName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1E40AF',
+  },
+  serviceItemPrice: {
+    fontSize: 13,
     fontWeight: '800',
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: '#1E40AF',
   },
-  successBtnRow: {
-    gap: 8,
-  },
-  calOpenBtn: {
-    backgroundColor: '#0f172a',
-    borderRadius: 8,
-    paddingVertical: 10,
+  successCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
     alignItems: 'center',
+    marginTop: 40,
+    ...shadows.card,
   },
-  calOpenBtnText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '800',
+  successIcon: {
+    fontSize: 48,
+    marginBottom: 12,
   },
-  returnBtn: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  returnBtnText: {
-    color: '#065f46',
-    fontSize: 12,
+  successTitle: {
+    fontSize: 20,
     fontWeight: '900',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  successSub: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 20,
   },
   whatsappBtn: {
     backgroundColor: '#25D366',
-    borderRadius: 8,
-    paddingVertical: 10,
+    borderRadius: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    marginBottom: 10,
+    width: '100%',
     alignItems: 'center',
   },
   whatsappBtnText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  conflictToast: {
-    backgroundColor: '#fef2f2',
-    borderWidth: 1.5,
-    borderColor: '#fecaca',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 14,
-  },
-  conflictTitle: {
     fontSize: 14,
-    fontWeight: '900',
-    color: '#991b1b',
-    marginBottom: 4,
-  },
-  conflictText: {
-    fontSize: 12,
-    color: '#b91c1c',
-    marginBottom: 10,
-  },
-  conflictChangeRoomBtn: {
-    backgroundColor: '#dc2626',
-    borderRadius: 6,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  conflictChangeRoomBtnText: {
-    color: '#ffffff',
-    fontSize: 12,
     fontWeight: '800',
+    color: '#FFFFFF',
   },
-  formErrorBanner: {
-    backgroundColor: '#fef2f2',
-    borderColor: '#fecaca',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 14,
-  },
-  formErrorText: {
-    color: '#b91c1c',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  // Occupied Room Card Styles
-  selectedRoomCardOccupied: {
-    backgroundColor: '#fff1f2',
-    borderColor: '#f43f5e',
-    borderWidth: 1.5,
-  },
-  selectedRoomNumOccupied: {
-    color: '#e11d48',
-  },
-  selectedRoomRateOccupied: {
-    color: '#be123c',
-  },
-  occupiedBadge: {
-    backgroundColor: '#ffe4e6',
-    borderColor: '#fda4af',
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  occupiedBadgeText: {
-    color: '#e11d48',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.3,
-  },
-  occupiedNoticeBox: {
-    backgroundColor: '#fee2e2',
-    borderColor: '#fca5a5',
-    borderWidth: 1,
-    borderRadius: 6,
-    padding: 8,
-    marginTop: 8,
-    gap: 6,
-  },
-  occupiedNoticeText: {
-    color: '#991b1b',
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 15,
-  },
-  occupiedChangeBtn: {
-    backgroundColor: '#e11d48',
-    borderRadius: 6,
-    paddingVertical: 7,
-    alignItems: 'center',
-  },
-  occupiedChangeBtnText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  // Conflict Popup Modal Styles
-  conflictModalCard: {
+  doneBtn: {
+    backgroundColor: '#0066FF',
+    borderRadius: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     width: '100%',
-    maxWidth: 380,
-    backgroundColor: '#ffffff',
+    alignItems: 'center',
+  },
+  doneBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  modalContainer: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
-    alignItems: 'center',
     ...shadows.modal,
   },
-  conflictModalIconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#fee2e2',
+  modalHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: '#fecaca',
+    justifyContent: 'space-between',
+    marginBottom: 14,
   },
-  conflictModalIconText: {
-    fontSize: 30,
-  },
-  conflictModalTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0f172a',
-    marginBottom: 2,
-    textAlign: 'center',
-  },
-  conflictModalSubtitle: {
-    fontSize: 12,
+  modalTitle: {
+    fontSize: 16,
     fontWeight: '800',
-    color: '#e11d48',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 12,
+    color: '#1F2937',
+    marginBottom: 10,
   },
-  conflictModalBodyBox: {
-    backgroundColor: '#fff1f2',
-    borderColor: '#fecdd3',
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    width: '100%',
-    marginBottom: 16,
+  modalCloseIcon: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#6B7280',
   },
-  conflictModalBodyText: {
-    fontSize: 13,
-    color: '#9f1239',
+  modalOptionRow: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderColor: '#F3F4F6',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalOptionSelected: {
+    backgroundColor: '#EFF6FF',
+  },
+  modalOptionText: {
+    fontSize: 14,
     fontWeight: '600',
-    lineHeight: 18,
-    textAlign: 'center',
+    color: '#374151',
   },
-  conflictModalActions: {
-    width: '100%',
-    gap: 8,
+  modalOptionTextSelected: {
+    color: '#0066FF',
+    fontWeight: '800',
   },
-  conflictModalPrimaryBtn: {
-    backgroundColor: '#2563eb',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  conflictModalPrimaryBtnText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  conflictModalSecondaryBtn: {
-    backgroundColor: '#0f172a',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  conflictModalSecondaryBtnText: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  conflictModalDismissBtn: {
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  conflictModalDismissBtnText: {
-    color: '#64748b',
+  roomPriceTag: {
     fontSize: 12,
     fontWeight: '700',
+    color: '#059669',
   },
 });
-
-

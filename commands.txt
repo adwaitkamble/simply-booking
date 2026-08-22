@@ -1,0 +1,2 @@
+npm run start --workspace=@hotel-pms/api
+npm run start --workspace=@hotel-pms/mobile

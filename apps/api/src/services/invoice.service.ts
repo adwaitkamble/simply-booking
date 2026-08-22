@@ -49,7 +49,7 @@ export class InvoiceService {
     const d2 = new Date(reservation.checkOut);
     const diffTime = d2.getTime() - d1.getTime();
     const nights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-    const basePrice = reservation.room.roomCategory.basePrice;
+    const basePrice = (reservation.room as any).pricePerNight ?? reservation.room.roomCategory.basePrice;
     const roomCharge = Math.round(nights * basePrice * 100) / 100;
 
     // 3. Format ancillary items
@@ -86,7 +86,7 @@ export class InvoiceService {
           items: {
             create: [
               {
-                description: `${reservation.room.roomCategory.name} (${nights} night${nights > 1 ? 's' : ''} @ ₹${basePrice.toFixed(2)}/night)`,
+                description: `${reservation.room.roomCategory.name} - Room ${reservation.room.roomNumber} (${nights} night${nights > 1 ? 's' : ''} @ ₹${basePrice.toFixed(2)}/night)`,
                 amount: roomCharge,
                 quantity: nights,
                 category: 'Room',

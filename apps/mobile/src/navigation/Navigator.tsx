@@ -14,6 +14,12 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { AddReservationScreen } from '../screens/AddReservationScreen';
+import { BookingsScreen } from '../screens/BookingsScreen';
+import { RoomsScreen } from '../screens/RoomsScreen';
+import { MyTeamScreen } from '../screens/MyTeamScreen';
+import { EditUserScreen } from '../screens/EditUserScreen';
+import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
+import { SupportScreen } from '../screens/SupportScreen';
 import { HousekeepingScreen } from '../screens/HousekeepingScreen';
 import { InvoiceScreen } from '../screens/InvoiceScreen';
 import { ChannelManagerScreen } from '../screens/ChannelManagerScreen';
@@ -21,7 +27,7 @@ import { AvailableRoomItem } from '../api/client';
 import { shadows } from '../theme';
 
 type TabName = 'booking' | 'housekeeping' | 'invoicing' | 'channel';
-type ScreenName = 'dashboard' | 'addReservation' | 'housekeeping' | 'invoicing' | 'channel';
+type ScreenName = 'dashboard' | 'addReservation' | 'bookings' | 'rooms' | 'myTeam' | 'editUser' | 'changePassword' | 'support' | 'housekeeping' | 'invoicing' | 'channel';
 
 interface NavigationState {
   currentTab: TabName;
@@ -33,6 +39,7 @@ interface NavigationState {
   prefilledRoomId?: string;
   prefilledRoomNumber?: string;
   focusedCalendarDate?: string;
+  selectedTeamUserForEdit?: any;
 }
 
 export const Navigator: React.FC = () => {
@@ -40,12 +47,15 @@ export const Navigator: React.FC = () => {
   const [authScreen, setAuthScreen] = useState<'login' | 'register'>('login');
   const [profileModalVisible, setProfileModalVisible] = useState(false);
 
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const checkoutStr = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
   const [navState, setNavState] = useState<NavigationState>({
     currentTab: 'booking',
     currentScreen: 'dashboard',
     selectedRoom: null,
-    checkIn: '2026-12-01',
-    checkOut: '2026-12-03',
+    checkIn: todayStr,
+    checkOut: checkoutStr,
     activeReservationId: undefined,
     focusedCalendarDate: undefined,
   });
@@ -118,6 +128,55 @@ export const Navigator: React.FC = () => {
     }));
   };
 
+  const navigateToBookings = () => {
+    setNavState((prev) => ({
+      ...prev,
+      currentTab: 'booking',
+      currentScreen: 'bookings',
+    }));
+  };
+
+  const navigateToRooms = () => {
+    setNavState((prev) => ({
+      ...prev,
+      currentTab: 'booking',
+      currentScreen: 'rooms',
+    }));
+  };
+
+  const navigateToMyTeam = () => {
+    setNavState((prev) => ({
+      ...prev,
+      currentTab: 'booking',
+      currentScreen: 'myTeam',
+    }));
+  };
+
+  const navigateToEditUser = (userForEdit?: any) => {
+    setNavState((prev) => ({
+      ...prev,
+      currentTab: 'booking',
+      currentScreen: 'editUser',
+      selectedTeamUserForEdit: userForEdit || null,
+    }));
+  };
+
+  const navigateToChangePassword = () => {
+    setNavState((prev) => ({
+      ...prev,
+      currentTab: 'booking',
+      currentScreen: 'changePassword',
+    }));
+  };
+
+  const navigateToSupport = () => {
+    setNavState((prev) => ({
+      ...prev,
+      currentTab: 'booking',
+      currentScreen: 'support',
+    }));
+  };
+
   const navigateToInvoice = (reservationId: string) => {
     setNavState((prev) => ({
       ...prev,
@@ -185,6 +244,50 @@ export const Navigator: React.FC = () => {
                 focusedDate={navState.focusedCalendarDate}
                 onOpenBookingForm={navigateToAddReservation}
                 onOpenInvoice={navigateToInvoice}
+                onOpenBookings={navigateToBookings}
+                onOpenRooms={navigateToRooms}
+                onOpenMyTeam={navigateToMyTeam}
+                onOpenChangePassword={navigateToChangePassword}
+                onOpenSupport={navigateToSupport}
+                onLogout={handleLogout}
+                onNavigateTab={switchTab}
+              />
+            )}
+            {navState.currentScreen === 'bookings' && (
+              <BookingsScreen
+                onBack={() => navigateToDashboard()}
+                onSelectBooking={(b) => {
+                  if (b.id) navigateToInvoice(b.id);
+                }}
+              />
+            )}
+            {navState.currentScreen === 'rooms' && (
+              <RoomsScreen
+                onBack={() => navigateToDashboard()}
+              />
+            )}
+            {navState.currentScreen === 'myTeam' && (
+              <MyTeamScreen
+                onBack={() => navigateToDashboard()}
+                onOpenEditUser={(targetUser) => navigateToEditUser(targetUser)}
+              />
+            )}
+            {navState.currentScreen === 'editUser' && (
+              <EditUserScreen
+                initialUser={navState.selectedTeamUserForEdit}
+                onBack={() => navigateToMyTeam()}
+                onSuccess={() => navigateToMyTeam()}
+              />
+            )}
+            {navState.currentScreen === 'changePassword' && (
+              <ChangePasswordScreen
+                onBack={() => navigateToDashboard()}
+                onSuccess={() => navigateToDashboard()}
+              />
+            )}
+            {navState.currentScreen === 'support' && (
+              <SupportScreen
+                onBack={() => navigateToDashboard()}
               />
             )}
             {navState.currentScreen === 'addReservation' && (
@@ -195,7 +298,7 @@ export const Navigator: React.FC = () => {
                 initialCheckOut={navState.checkOut}
                 onBack={() => navigateToDashboard()}
                 onBookingSuccess={(resId, bookedCheckIn) => {
-                  navigateToDashboard(bookedCheckIn);
+                  navigateToBookings();
                 }}
               />
             )}

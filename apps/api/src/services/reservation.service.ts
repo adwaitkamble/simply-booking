@@ -69,14 +69,14 @@ export class ReservationService {
       throw error;
     }
 
-    // Validate that checkIn is not in the past
-    const todayMidnight = new Date();
-    todayMidnight.setHours(0, 0, 0, 0);
-    const checkInMidnight = new Date(checkIn);
-    checkInMidnight.setHours(0, 0, 0, 0);
+    // Validate that checkIn is not in the past (allow today and future dates using ISO date string comparison)
+    const checkInIsoDate = checkIn.toISOString().slice(0, 10);
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayIsoDate = yesterday.toISOString().slice(0, 10);
 
-    if (checkInMidnight < todayMidnight) {
-      const error: any = new Error('Cannot book rooms for a past date');
+    if (checkInIsoDate < yesterdayIsoDate) {
+      const error: any = new Error(`Cannot book rooms for past dates (${checkInIsoDate})`);
       error.statusCode = 400;
       throw error;
     }
@@ -311,5 +311,120 @@ export class ReservationService {
         createdAt: 'desc',
       },
     });
+  }
+
+  /**
+   * GET /api/bookings Endpoint Service:
+   * Retrieves data filtered by startDate and endDate overlap query, mapped to exact UI format
+   */
+  static async getBookings(startDate?: string, endDate?: string, propertyId?: string) {
+    let checkInCondition: any = undefined;
+    let checkOutCondition: any = undefined;
+
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        // Date Overlap condition: checkIn < endDate AND checkOut > startDate
+        checkInCondition = { lt: end };
+        checkOutCondition = { gt: start };
+      }
+    }
+
+    const reservations = await prisma.reservations.findMany({
+      where: {
+        ...(propertyId ? { room: { roomCategory: { propertyId } } } : {}),
+        ...(checkInCondition && checkOutCondition
+          ? {
+              checkIn: checkInCondition,
+              checkOut: checkOutCondition,
+            }
+          : {}),
+      },
+      include: {
+        guest: true,
+        room: {
+          include: {
+            roomCategory: true,
+          },
+        },
+      },
+      orderBy: {
+        checkIn: 'asc',
+      },
+    });
+
+    return reservations.map((res) => {
+      const total = Number(res.totalAmount || 0);
+      const advance = Number(res.advancePaid || 0);
+      const balance = Math.max(0, total - advance);
+
+      const categoryName = res.room?.roomCategory?.name || 'Standard';
+      const roomNum = res.room?.roomNumber || 'Room';
+      const roomNameAndPlan = `${categoryName} ${roomNum} EP`;
+
+      // Generate a clean numeric booking ID from UUID
+      const hexPart = res.id.replace(/-/g, '').slice(-4);
+      const numericId = (parseInt(hexPart, 16) % 9000) + 1000;
+      const bookingId = `#${numericId}`;
+
+      const formatShortDate = (d: Date) => {
+        return d.toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        });
+      };
+
+      const formatTimestamp = (d: Date) => {
+        return d.toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        });
+      };
+
+      return {
+        id: res.id,
+        roomId: res.roomId,
+        checkIn: res.checkIn.toISOString(),
+        checkOut: res.checkOut.toISOString(),
+        room: res.room,
+        guest: res.guest,
+        bookingId,
+        roomNameAndPlan,
+        guestName: res.guest?.name || 'Walk-in Guest',
+        guestPhone: res.guest?.phone || '+91 9823012345',
+        lastUpdatedBy: 'Front Desk',
+        lastUpdatedTimestamp: formatTimestamp(res.updatedAt || res.createdAt),
+        counts: {
+          rooms: 1,
+          children: res.children || 0,
+          adults: res.adults || 1,
+        },
+        dates: {
+          checkIn: formatShortDate(res.checkIn),
+          checkOut: formatShortDate(res.checkOut),
+          rawCheckIn: res.checkIn.toISOString().slice(0, 10),
+          rawCheckOut: res.checkOut.toISOString().slice(0, 10),
+        },
+        financials: {
+          totalAmount: total,
+          advancePaid: advance,
+          balanceAmount: balance,
+        },
+        status: res.status,
+      };
+    });
+  }
+
+  /**
+   * Helper method to trigger WhatsApp notification via WhatsAppService
+   */
+  static async sendWhatsAppNotification(payload: any) {
+    return await WhatsAppService.sendBookingConfirmation(payload);
   }
 }

@@ -71,15 +71,40 @@ export class AuthService {
         },
       });
 
-      // Create a starter room category so the property is ready for rooms
-      await tx.roomCategories.create({
-        data: {
-          name: 'Standard Room',
-          description: 'Standard comfortable room with essential amenities',
-          basePrice: currency === 'USD' ? 50 : 2500,
-          propertyId: property.id,
+      // Create starter room categories (Villa, Luxury Suite, Double Bed Room, Single Bed Room)
+      const starterCategories = [
+        {
+          name: 'Villa',
+          description: 'Private luxury villa with pool & terrace',
+          basePrice: currency === 'USD' ? 150 : 8000,
         },
-      });
+        {
+          name: 'Luxury Suite',
+          description: 'Executive luxury suite with king bed & lounge',
+          basePrice: currency === 'USD' ? 100 : 5000,
+        },
+        {
+          name: 'Double Bed Room',
+          description: 'Spacious room with 2 double beds & desk',
+          basePrice: currency === 'USD' ? 70 : 3500,
+        },
+        {
+          name: 'Single Bed Room',
+          description: 'Cozy single bedroom with essential amenities',
+          basePrice: currency === 'USD' ? 50 : 2500,
+        },
+      ];
+
+      for (const cat of starterCategories) {
+        await tx.roomCategories.create({
+          data: {
+            name: cat.name,
+            description: cat.description,
+            basePrice: cat.basePrice,
+            propertyId: property.id,
+          },
+        });
+      }
 
       const user = await tx.users.create({
         data: {
@@ -101,6 +126,9 @@ export class AuthService {
       userId: result.user.id,
       email: result.user.email,
       name: result.user.name,
+      role: (result.user.role as any) || 'Admin',
+      isActive: result.user.isActive ?? true,
+      permissions: (result.user.permissions as any) || null,
       propertyId: result.property.id,
       propertyName: result.property.name,
     };
@@ -115,6 +143,9 @@ export class AuthService {
         name: result.user.name,
         email: result.user.email,
         mobileNumber: result.user.mobileNumber,
+        role: (result.user.role as any) || 'Admin',
+        isActive: result.user.isActive ?? true,
+        permissions: (result.user.permissions as any) || null,
         propertyId: result.user.propertyId,
         createdAt: result.user.createdAt,
         updatedAt: result.user.updatedAt,
@@ -162,6 +193,12 @@ export class AuthService {
       throw error;
     }
 
+    if (user.isActive === false) {
+      const error: any = new Error('Your account has been deactivated. Contact property administrator.');
+      error.statusCode = 403;
+      throw error;
+    }
+
     const isMatch = await bcrypt.compare(password, user.passwordHash);
 
     if (!isMatch) {
@@ -174,6 +211,9 @@ export class AuthService {
       userId: user.id,
       email: user.email,
       name: user.name,
+      role: (user.role as any) || 'Admin',
+      isActive: user.isActive ?? true,
+      permissions: (user.permissions as any) || null,
       propertyId: user.property.id,
       propertyName: user.property.name,
     };
@@ -188,6 +228,9 @@ export class AuthService {
         name: user.name,
         email: user.email,
         mobileNumber: user.mobileNumber,
+        role: (user.role as any) || 'Admin',
+        isActive: user.isActive ?? true,
+        permissions: (user.permissions as any) || null,
         propertyId: user.propertyId,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
@@ -242,6 +285,81 @@ export class AuthService {
       property: user.property,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+    };
+  }
+
+  /**
+   * Change user password securely with strict password policy & bcrypt salt 12
+   */
+  static async changePassword(userId: string, payload: { currentPassword?: string; newPassword?: string; confirmPassword?: string }) {
+    const { currentPassword, newPassword, confirmPassword } = payload;
+
+    // 1. Input Validation
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      const error: any = new Error('Current password, new password, and confirm password are required.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (newPassword !== confirmPassword) {
+      const error: any = new Error('New password and confirm password do not match.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 2. Password Policy Check: Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
+    const minLength = newPassword.length >= 8;
+    const hasUpper = /[A-Z]/.test(newPassword);
+    const hasLower = /[a-z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+    const hasSpecial = /[^A-Za-z0-9]/.test(newPassword);
+
+    if (!minLength || !hasUpper || !hasLower || !hasNumber || !hasSpecial) {
+      const error: any = new Error(
+        'Password must be at least 8 characters long and include 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character.'
+      );
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 3. Fetch user record from PostgreSQL
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      const error: any = new Error('User not found.');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // 4. Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      const error: any = new Error('Current password is incorrect.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 5. Prevent reuse of current password
+    if (currentPassword === newPassword) {
+      const error: any = new Error('New password cannot be identical to current password.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 6. Hash new password with salt rounds 12 & update PostgreSQL
+    const saltRounds = 12;
+    const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    await prisma.users.update({
+      where: { id: userId },
+      data: { passwordHash: newPasswordHash },
+    });
+
+    return {
+      success: true,
+      message: 'Password changed successfully',
     };
   }
 }

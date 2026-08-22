@@ -85,11 +85,26 @@ export interface ChainDTO {
   properties?: PropertyDTO[];
 }
 
+export type UserRole = 'Admin' | 'Staff';
+
+export interface ActionPermissions {
+  create: boolean;
+  edit: boolean;
+  view: boolean;
+  delete: boolean;
+  list: boolean;
+}
+
+export type ModulePermissions = Record<string, ActionPermissions>;
+
 export interface UserDTO {
   id: string;
   name: string;
   email: string;
   mobileNumber?: string | null;
+  role: UserRole;
+  isActive: boolean;
+  permissions?: ModulePermissions | null;
   propertyId: string;
   property?: PropertyDTO;
   createdAt: Date | string;
@@ -130,10 +145,37 @@ export interface LoginPayload {
   password: string;
 }
 
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
+
+export interface CreateTeamMemberPayload {
+  name: string;
+  email: string;
+  password: string;
+  role?: UserRole;
+  isActive?: boolean;
+  permissions?: ModulePermissions;
+}
+
+export interface UpdateTeamMemberPayload {
+  name?: string;
+  email?: string;
+  password?: string;
+  role?: UserRole;
+  isActive?: boolean;
+  permissions?: ModulePermissions;
+}
+
 export interface AuthUserPayload {
   userId: string;
   email: string;
   name: string;
+  role: UserRole;
+  isActive: boolean;
+  permissions?: ModulePermissions | null;
   propertyId: string;
   propertyName: string;
 }
@@ -181,6 +223,8 @@ export interface RoomStatusLogDTO {
 export interface RoomDTO {
   id: string;
   roomNumber: string;
+  pricePerNight?: number | null;
+  roomSize?: string | null;
   status: RoomStatus;
   roomCategoryId: string;
   roomCategory?: RoomCategoryDTO;
@@ -295,6 +339,8 @@ export interface CreateRoomCategoryInput {
 
 export interface CreateRoomInput {
   roomNumber: string;
+  pricePerNight?: number;
+  roomSize?: string;
   status?: RoomStatus;
   roomCategoryId: string;
 }

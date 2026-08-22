@@ -51,12 +51,20 @@ model Chains {
   @@map("Chains")
 }
 
+enum UserRole {
+  Admin
+  Staff
+}
+
 model Users {
   id           String     @id @default(uuid())
   name         String
   email        String     @unique
   passwordHash String
   mobileNumber String?
+  role         UserRole   @default(Admin)
+  isActive     Boolean    @default(true)
+  permissions  Json?
   propertyId   String
   property     Properties @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   createdAt    DateTime   @default(now())
@@ -100,6 +108,8 @@ model RoomCategories {
 model Rooms {
   id             String           @id @default(uuid())
   roomNumber     String
+  pricePerNight  Float?
+  roomSize       String?
   status         RoomStatus       @default(Clean)
   roomCategoryId String
   roomCategory   RoomCategories   @relation(fields: [roomCategoryId], references: [id], onDelete: Cascade)

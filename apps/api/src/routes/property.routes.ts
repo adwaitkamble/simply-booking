@@ -19,3 +19,6 @@ propertyRouter.get('/:propertyId', PropertyController.getPropertyById);
 
 // GET /api/properties/:propertyId/rooms
 propertyRouter.get('/:propertyId/rooms', RoomController.getPropertyRooms);
+
+// DELETE /api/properties/:propertyId/rooms/:roomId
+propertyRouter.delete('/:propertyId/rooms/:roomId', RoomController.deleteRoom);

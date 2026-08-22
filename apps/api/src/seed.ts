@@ -103,15 +103,15 @@ async function main() {
 
     // 5. Rooms Definition
     const roomsToSeed = [
-      { roomNumber: '101', catName: 'Deluxe Heritage Room', status: RoomStatus.Clean },
-      { roomNumber: '102', catName: 'Deluxe Heritage Room', status: RoomStatus.Clean },
-      { roomNumber: '103', catName: 'Deluxe Heritage Room', status: RoomStatus.Dirty },
-      { roomNumber: '201', catName: 'Executive Garden Suite', status: RoomStatus.Clean },
-      { roomNumber: '202', catName: 'Executive Garden Suite', status: RoomStatus.Clean },
-      { roomNumber: '203', catName: 'Executive Garden Suite', status: RoomStatus.Maintenance },
-      { roomNumber: '301', catName: 'Royal Maratha Penthouse', status: RoomStatus.Clean },
-      { roomNumber: '302', catName: 'Royal Maratha Penthouse', status: RoomStatus.Clean },
-      { roomNumber: '303', catName: 'Royal Maratha Penthouse', status: RoomStatus.Clean },
+      { roomNumber: '101', catName: 'Deluxe Heritage Room', status: RoomStatus.Clean, pricePerNight: 2800, roomSize: '250 sq ft' },
+      { roomNumber: '102', catName: 'Deluxe Heritage Room', status: RoomStatus.Clean, pricePerNight: 3100, roomSize: '280 sq ft (Corner)' },
+      { roomNumber: '103', catName: 'Deluxe Heritage Room', status: RoomStatus.Dirty, pricePerNight: 2800, roomSize: '250 sq ft' },
+      { roomNumber: '201', catName: 'Executive Garden Suite', status: RoomStatus.Clean, pricePerNight: 4500, roomSize: '400 sq ft' },
+      { roomNumber: '202', catName: 'Executive Garden Suite', status: RoomStatus.Clean, pricePerNight: 4900, roomSize: '450 sq ft (Pool View)' },
+      { roomNumber: '203', catName: 'Executive Garden Suite', status: RoomStatus.Maintenance, pricePerNight: 4500, roomSize: '400 sq ft' },
+      { roomNumber: '301', catName: 'Royal Maratha Penthouse', status: RoomStatus.Clean, pricePerNight: 8500, roomSize: '750 sq ft' },
+      { roomNumber: '302', catName: 'Royal Maratha Penthouse', status: RoomStatus.Clean, pricePerNight: 9500, roomSize: '850 sq ft (Jacuzzi)' },
+      { roomNumber: '303', catName: 'Royal Maratha Penthouse', status: RoomStatus.Clean, pricePerNight: 8500, roomSize: '750 sq ft' },
     ];
 
     const roomMap: Record<string, string> = {};
@@ -123,6 +123,8 @@ async function main() {
         existingRoom = await prisma.rooms.create({
           data: {
             roomNumber: r.roomNumber,
+            pricePerNight: r.pricePerNight,
+            roomSize: r.roomSize,
             status: r.status,
             roomCategoryId: categoryMap[r.catName],
           },

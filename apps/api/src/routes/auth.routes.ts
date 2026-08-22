@@ -46,3 +46,17 @@ authRouter.get('/me', authenticateUser, async (req: Request, res: Response, next
     next(err);
   }
 });
+
+/**
+ * POST /api/auth/change-password
+ * Change password for current authenticated user
+ */
+authRouter.post('/change-password', authenticateUser, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.userId;
+    const result = await AuthService.changePassword(userId, req.body);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});

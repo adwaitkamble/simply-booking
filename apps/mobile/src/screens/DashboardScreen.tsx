@@ -12,15 +12,18 @@ import {
   Dimensions,
   Linking,
   Platform,
+  Alert,
 } from 'react-native';
 import { io, Socket } from 'socket.io-client';
 import { ApiClient, AvailableRoomItem } from '../api/client';
 import { RoomStatus } from '@hotel-pms/types';
 import { borderRadius, shadows } from '../theme';
 import { GoogleCalendarDatePickerModal } from '../components/GoogleCalendarDatePickerModal';
+import { NavigationDrawer, DrawerMenuItemId } from '../components/NavigationDrawer';
+import { sendWhatsAppConfirmation } from '../utils/whatsapp';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const LEFT_COL_WIDTH = 120;
+const LEFT_COL_WIDTH = 135;
 const DATE_COL_WIDTH = 100;
 const ROW_HEIGHT = 80;
 const HEADER_ROW_HEIGHT = 50;
@@ -35,6 +38,13 @@ interface DashboardScreenProps {
     checkOut?: string;
   }) => void;
   onOpenInvoice?: (reservationId: string) => void;
+  onOpenBookings?: () => void;
+  onOpenRooms?: () => void;
+  onOpenMyTeam?: () => void;
+  onOpenChangePassword?: () => void;
+  onOpenSupport?: () => void;
+  onLogout?: () => void;
+  onNavigateTab?: (tab: 'booking' | 'housekeeping' | 'invoicing' | 'channel') => void;
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({
@@ -42,6 +52,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onSelectRoom,
   onOpenBookingForm,
   onOpenInvoice,
+  onOpenBookings,
+  onOpenRooms,
+  onOpenMyTeam,
+  onOpenChangePassword,
+  onOpenSupport,
+  onLogout,
+  onNavigateTab,
 }) => {
   const [property, setProperty] = useState<any | null>(null);
   const [rooms, setRooms] = useState<any[]>([]);
@@ -51,29 +68,24 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Calendar Date Window (Defaults to today's date)
-  const [baseDate, setBaseDate] = useState<Date>(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  const createUtcDateFromLocal = (rawDate?: string | Date) => {
+    let now = rawDate ? new Date(rawDate) : new Date();
+    if (isNaN(now.getTime())) now = new Date();
+    return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  };
 
+  // Calendar Date Window (Defaults to today's UTC midnight)
+  const [baseDate, setBaseDate] = useState<Date>(() => {
     if (focusedDate) {
-      const d = new Date(focusedDate.slice(0, 10));
-      if (!isNaN(d.getTime())) {
-        return d < today ? today : d;
-      }
+      return createUtcDateFromLocal(focusedDate);
     }
-    return today;
+    return createUtcDateFromLocal();
   });
 
   // Keep baseDate in sync when focusedDate changes
   useEffect(() => {
     if (focusedDate) {
-      const d = new Date(focusedDate.slice(0, 10));
-      if (!isNaN(d.getTime())) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        setBaseDate(d < today ? today : d);
-      }
+      setBaseDate(createUtcDateFromLocal(focusedDate));
     }
   }, [focusedDate]);
 
@@ -82,17 +94,31 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [showAddRoomModal, setShowAddRoomModal] = useState<boolean>(false);
   const [newRoomNumber, setNewRoomNumber] = useState('');
   const [newRoomCategory, setNewRoomCategory] = useState('');
+  const [newRoomPrice, setNewRoomPrice] = useState('');
+  const [newRoomSize, setNewRoomSize] = useState('');
   const [newRoomStatus, setNewRoomStatus] = useState<RoomStatus>('Clean');
   const [savingRoom, setSavingRoom] = useState<boolean>(false);
   const [roomModalError, setRoomModalError] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
+  const [showNavigationDrawer, setShowNavigationDrawer] = useState<boolean>(false);
+
+  // New Category Creation Inline State
+  const [showAddCatForm, setShowAddCatForm] = useState<boolean>(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatBasePrice, setNewCatBasePrice] = useState('');
+  const [newCatDescription, setNewCatDescription] = useState('');
+  const [savingCat, setSavingCat] = useState<boolean>(false);
+  const [catFormError, setCatFormError] = useState<string | null>(null);
 
   // View Mode: weekly (7 days) or monthly (full calendar month)
   const [viewMode, setViewMode] = useState<'weekly' | 'monthly'>('weekly');
 
   const todayStr = useMemo(() => {
-    const today = new Date();
-    return today.toISOString().slice(0, 10);
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }, []);
 
   // Generate date array based on weekly or monthly view
@@ -103,7 +129,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
     if (viewMode === 'weekly') {
       for (let i = 0; i < 7; i++) {
-        const d = new Date(baseDate);
+        const d = new Date(baseDate.getTime());
         d.setUTCDate(baseDate.getUTCDate() + i);
         const isoDate = d.toISOString().slice(0, 10);
         dates.push({
@@ -122,7 +148,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       const month = baseDate.getUTCMonth();
       // Total days in the current month
       const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-      
+
       for (let i = 1; i <= daysInMonth; i++) {
         const d = new Date(Date.UTC(year, month, i));
         const isoDate = d.toISOString().slice(0, 10);
@@ -153,6 +179,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         setCategories(defaultProp.roomCategories);
         if (defaultProp.roomCategories.length > 0 && !newRoomCategory) {
           setNewRoomCategory(defaultProp.roomCategories[0].id);
+          setNewRoomPrice(String(defaultProp.roomCategories[0].basePrice));
         }
       }
 
@@ -257,6 +284,49 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     });
   };
 
+  // Add Room Category Selection Helper
+  const handleSelectCategory = (cat: any) => {
+    setNewRoomCategory(cat.id);
+    if (cat.basePrice !== undefined && cat.basePrice !== null) {
+      setNewRoomPrice(String(cat.basePrice));
+    }
+  };
+
+  // Add Dynamic Room Category Handler
+  const handleSaveCategory = async () => {
+    if (!newCatName.trim()) {
+      setCatFormError('Category Name is required (e.g. Executive Suite)');
+      return;
+    }
+    const priceNum = parseFloat(newCatBasePrice);
+    if (!newCatBasePrice || isNaN(priceNum) || priceNum < 0) {
+      setCatFormError('Valid Base Price (₹) is required');
+      return;
+    }
+
+    try {
+      setSavingCat(true);
+      setCatFormError(null);
+      const createdCat = await ApiClient.createRoomCategory({
+        name: newCatName.trim(),
+        basePrice: priceNum,
+        description: newCatDescription.trim() || undefined,
+      });
+
+      setCategories((prev) => [...prev, createdCat]);
+      setNewRoomCategory(createdCat.id);
+      setNewRoomPrice(String(createdCat.basePrice));
+      setShowAddCatForm(false);
+      setNewCatName('');
+      setNewCatBasePrice('');
+      setNewCatDescription('');
+    } catch (err: any) {
+      setCatFormError(err.message || 'Failed to create room category');
+    } finally {
+      setSavingCat(false);
+    }
+  };
+
   // Add Room Submission
   const handleSaveRoom = async () => {
     if (!newRoomNumber.trim()) {
@@ -271,13 +341,18 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     try {
       setSavingRoom(true);
       setRoomModalError(null);
+      const customPrice = newRoomPrice.trim() !== '' ? parseFloat(newRoomPrice) : undefined;
       await ApiClient.createRoom({
         roomNumber: newRoomNumber.trim(),
         roomCategoryId: newRoomCategory,
+        pricePerNight: customPrice,
+        roomSize: newRoomSize.trim() || undefined,
         status: newRoomStatus,
       });
       setShowAddRoomModal(false);
       setNewRoomNumber('');
+      setNewRoomPrice('');
+      setNewRoomSize('');
       loadData();
     } catch (err: any) {
       setRoomModalError(err.message || 'Failed to create room');
@@ -286,35 +361,136 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     }
   };
 
+  const handleDeleteRoom = (room: any) => {
+    const confirmDelete = async () => {
+      try {
+        await ApiClient.deleteRoom(room.id);
+        if (Platform.OS === 'web') {
+          window.alert(`Room #${room.roomNumber} has been removed.`);
+        } else {
+          Alert.alert('Success', `Room #${room.roomNumber} has been removed.`);
+        }
+        loadData();
+      } catch (err: any) {
+        const msg = err?.message || 'Failed to remove room';
+        if (Platform.OS === 'web') {
+          window.alert(`Cannot Remove Room: ${msg}`);
+        } else {
+          Alert.alert('Cannot Remove Room', msg);
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Are you sure you want to remove Room #${room.roomNumber} from your property?`)) {
+        confirmDelete();
+      }
+    } else {
+      Alert.alert(
+        `Remove Room #${room.roomNumber}`,
+        `Are you sure you want to remove Room #${room.roomNumber} from your property?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Remove', style: 'destructive', onPress: confirmDelete },
+        ]
+      );
+    }
+  };
+
+  const handleDeleteCategory = (cat: any) => {
+    if (categories.length <= 1) {
+      const msg = 'Cannot delete the only room category. Please create another category first.';
+      if (Platform.OS === 'web') {
+        window.alert(msg);
+      } else {
+        Alert.alert('Cannot Remove Category', msg);
+      }
+      return;
+    }
+
+    const confirmDelete = async () => {
+      try {
+        await ApiClient.deleteRoomCategory(cat.id);
+        const remaining = categories.filter((c) => c.id !== cat.id);
+        setCategories(remaining);
+        if (newRoomCategory === cat.id && remaining.length > 0) {
+          setNewRoomCategory(remaining[0].id);
+          setNewRoomPrice(String(remaining[0].basePrice));
+        }
+        loadData();
+      } catch (err: any) {
+        const msg = err?.message || 'Failed to remove category';
+        if (Platform.OS === 'web') {
+          window.alert(msg);
+        } else {
+          Alert.alert('Cannot Remove Category', msg);
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Are you sure you want to remove category "${cat.name}"?`)) {
+        confirmDelete();
+      }
+    } else {
+      Alert.alert(
+        `Remove Category "${cat.name}"`,
+        `Are you sure you want to remove room category "${cat.name}"?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Remove', style: 'destructive', onPress: confirmDelete },
+        ]
+      );
+    }
+  };
+
   // Compute position and span of reservations for a room
-  const getRoomReservationBlocks = (roomId: string) => {
-    if (!dateColumns || dateColumns.length === 0) return [];
+  const getRoomReservationBlocks = (roomObj: any) => {
+    if (!dateColumns || dateColumns.length === 0 || !roomObj) return [];
 
-    const roomRes = reservations.filter(
-      (r) => r.roomId === roomId && r.status !== 'Cancelled'
-    );
+    const targetRoomId = typeof roomObj === 'string' ? roomObj : roomObj.id || roomObj.roomId;
+    const targetRoomNum = typeof roomObj === 'object' ? String(roomObj.roomNumber || roomObj.roomName || '').replace('Room ', '').trim() : '';
 
-    const windowStart = dateColumns[0].date.getTime();
-    const windowEnd = dateColumns[dateColumns.length - 1].date.getTime() + 86400000;
+    const roomRes = reservations.filter((r) => {
+      if (r.status === 'Cancelled') return false;
+      const resRoomId = r.roomId || r.room?.id;
+      const resRoomNum = String(r.room?.roomNumber || r.roomNumber || r.roomNameAndPlan || '').replace('Room ', '').trim();
+
+      const matchesId = targetRoomId && resRoomId && resRoomId === targetRoomId;
+      const matchesNum = targetRoomNum && resRoomNum && (resRoomNum.includes(targetRoomNum) || targetRoomNum.includes(resRoomNum));
+
+      return matchesId || matchesNum;
+    });
+
+    const firstColIso = dateColumns[0].isoDate;
+    const lastColIso = dateColumns[dateColumns.length - 1].isoDate;
 
     return roomRes
       .map((res) => {
-        const checkInTime = new Date(res.checkIn).getTime();
-        const checkOutTime = new Date(res.checkOut).getTime();
+        const rawIn = res.checkIn || res.dates?.rawCheckIn || res.dates?.checkIn;
+        const rawOut = res.checkOut || res.dates?.rawCheckOut || res.dates?.checkOut;
 
-        if (checkInTime < windowEnd && checkOutTime > windowStart) {
-          const startDiffDays = Math.max(
-            0,
-            (checkInTime - windowStart) / (1000 * 60 * 60 * 24)
-          );
-          const endDiffDays = Math.min(
-            dateColumns.length,
-            (checkOutTime - windowStart) / (1000 * 60 * 60 * 24)
-          );
-          const spanDays = Math.max(1, endDiffDays - startDiffDays);
+        if (!rawIn || !rawOut) return null;
 
-          const left = Math.round(startDiffDays * DATE_COL_WIDTH) + 4;
-          const width = Math.round(spanDays * DATE_COL_WIDTH) - 8;
+        const resCheckInIso = typeof rawIn === 'string' ? rawIn.slice(0, 10) : new Date(rawIn).toISOString().slice(0, 10);
+        const resCheckOutIso = typeof rawOut === 'string' ? rawOut.slice(0, 10) : new Date(rawOut).toISOString().slice(0, 10);
+
+        if (resCheckInIso <= lastColIso && resCheckOutIso >= firstColIso) {
+          let startIndex = dateColumns.findIndex((col) => col.isoDate === resCheckInIso);
+          if (startIndex === -1) {
+            startIndex = resCheckInIso < firstColIso ? 0 : dateColumns.length - 1;
+          }
+
+          let endIndex = dateColumns.findIndex((col) => col.isoDate === resCheckOutIso);
+          if (endIndex === -1) {
+            endIndex = resCheckOutIso > lastColIso ? dateColumns.length : startIndex + 1;
+          }
+
+          const rawSpan = endIndex - startIndex;
+          const spanDays = rawSpan > 0 ? rawSpan : 1;
+          const left = Math.round(startIndex * DATE_COL_WIDTH) + 4;
+          const calculatedWidth = Math.round(spanDays * DATE_COL_WIDTH) - 8;
+          const width = Math.max(DATE_COL_WIDTH - 12, calculatedWidth);
 
           return {
             ...res,
@@ -358,7 +534,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       {/* 1. Bright Blue Header */}
       <View style={styles.topHeaderContainer}>
         <View style={styles.headerBrandRow}>
-          <TouchableOpacity style={styles.headerMenuBtn} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.headerMenuBtn}
+            onPress={() => setShowNavigationDrawer(true)}
+            activeOpacity={0.7}
+          >
             <Text style={styles.headerMenuText}>☰</Text>
           </TouchableOpacity>
           <Text style={styles.brandTitle} numberOfLines={1}>
@@ -477,14 +657,34 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               </View>
 
               {/* Room Rows */}
-              {rooms.map((room) => (
-                <View key={room.id} style={styles.leftRoomCell}>
-                  <Text style={styles.roomNumberText}>#{room.roomNumber}</Text>
-                  <Text style={styles.roomCategoryText} numberOfLines={1}>
-                    {room.roomCategory?.name || 'Standard'}
-                  </Text>
-                </View>
-              ))}
+              {rooms.map((room) => {
+                const roomPrice = room.pricePerNight ?? room.roomCategory?.basePrice;
+                return (
+                  <View key={room.id} style={styles.leftRoomCell}>
+                    <View style={styles.roomHeaderRow}>
+                      <Text style={styles.roomNumberText}>#{room.roomNumber}</Text>
+                      <TouchableOpacity
+                        onPress={() => handleDeleteRoom(room)}
+                        style={styles.deleteRoomBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text style={styles.deleteRoomBtnText}>🗑️</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.roomCategoryNameText} numberOfLines={1}>
+                      {room.roomCategory?.name || 'Standard'}
+                    </Text>
+                    <Text style={styles.roomPriceTagText} numberOfLines={1}>
+                      ₹{roomPrice ? Number(roomPrice).toLocaleString('en-IN') : 0}/night
+                    </Text>
+                    {room.roomSize ? (
+                      <Text style={styles.roomSizeText} numberOfLines={1}>
+                        📐 {room.roomSize}
+                      </Text>
+                    ) : null}
+                  </View>
+                );
+              })}
             </View>
 
             {/* RIGHT HORIZONTALLY SCROLLABLE AREA */}
@@ -671,28 +871,128 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               placeholderTextColor="#94a3b8"
             />
 
-            <Text style={styles.inputLabel}>Room Category *</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, marginBottom: 2 }}>
+              <Text style={styles.inputLabel}>Room Category *</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowAddCatForm(!showAddCatForm);
+                  setCatFormError(null);
+                }}
+                style={{ paddingVertical: 2, paddingHorizontal: 6 }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#0066FF' }}>
+                  {showAddCatForm ? '✕ Close Category Form' : '+ Add New Category'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {showAddCatForm ? (
+              <View style={styles.inlineCatFormBox}>
+                <Text style={styles.inlineCatTitle}>✨ Create Custom Room Category</Text>
+                {catFormError ? (
+                  <View style={styles.modalErrorBox}>
+                    <Text style={styles.modalErrorText}>{catFormError}</Text>
+                  </View>
+                ) : null}
+                <Text style={styles.inputLabel}>Category Name *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g. Luxury Villa, Single Bed Room, Penthouse"
+                  value={newCatName}
+                  onChangeText={setNewCatName}
+                  placeholderTextColor="#94a3b8"
+                />
+
+                <Text style={styles.inputLabel}>Category Default Base Price (₹) *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g. 4500"
+                  value={newCatBasePrice}
+                  onChangeText={setNewCatBasePrice}
+                  keyboardType="numeric"
+                  placeholderTextColor="#94a3b8"
+                />
+
+                <Text style={styles.inputLabel}>Description (Optional)</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g. Sea facing balcony, complimentary breakfast..."
+                  value={newCatDescription}
+                  onChangeText={setNewCatDescription}
+                  placeholderTextColor="#94a3b8"
+                />
+
+                <TouchableOpacity
+                  style={styles.saveCatBtn}
+                  onPress={handleSaveCategory}
+                  disabled={savingCat}
+                >
+                  {savingCat ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={styles.saveCatBtnText}>✓ Save Category</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
               {categories.map((cat) => (
-                <TouchableOpacity
+                <View
                   key={cat.id}
                   style={[
                     styles.catOptionChip,
                     newRoomCategory === cat.id && styles.catOptionChipActive,
+                    { flexDirection: 'row', alignItems: 'center', gap: 6 },
                   ]}
-                  onPress={() => setNewRoomCategory(cat.id)}
                 >
-                  <Text
-                    style={[
-                      styles.catOptionText,
-                      newRoomCategory === cat.id && styles.catOptionTextActive,
-                    ]}
+                  <TouchableOpacity onPress={() => handleSelectCategory(cat)}>
+                    <Text
+                      style={[
+                        styles.catOptionText,
+                        newRoomCategory === cat.id && styles.catOptionTextActive,
+                      ]}
+                    >
+                      {cat.name} (Base ₹{cat.basePrice})
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDeleteCategory(cat)}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   >
-                    {cat.name} (₹{cat.basePrice})
-                  </Text>
-                </TouchableOpacity>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: newRoomCategory === cat.id ? '#ffffff' : '#ef4444',
+                        fontWeight: '800',
+                        paddingLeft: 2,
+                      }}
+                    >
+                      ✕
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               ))}
             </ScrollView>
+
+            <Text style={styles.inputLabel}>Room Price (₹ / night)</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g. 2500, 3200 (Default from category)"
+              value={newRoomPrice}
+              onChangeText={setNewRoomPrice}
+              keyboardType="numeric"
+              placeholderTextColor="#94a3b8"
+            />
+
+            <Text style={styles.inputLabel}>Room Size / Type Details</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="e.g. 250 sq ft, King Bed, Deluxe Suite"
+              value={newRoomSize}
+              onChangeText={setNewRoomSize}
+              placeholderTextColor="#94a3b8"
+            />
 
             <Text style={styles.inputLabel}>Initial Status</Text>
             <View style={styles.statusOptionRow}>
@@ -828,6 +1128,28 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
                 <View style={styles.detailActionRow}>
                   <TouchableOpacity
+                    style={styles.detailWaBtn}
+                    onPress={() => {
+                      sendWhatsAppConfirmation({
+                        guestName: selectedReservation.guest?.name || 'Guest',
+                        guestPhone: selectedReservation.guest?.phone || '',
+                        roomName: selectedReservation.room?.roomNumber ? `Room ${selectedReservation.room.roomNumber}` : 'Room',
+                        checkIn: selectedReservation.checkIn.slice(0, 10),
+                        checkOut: selectedReservation.checkOut.slice(0, 10),
+                        totalAmount: selectedReservation.totalAmount,
+                        advancePaid: selectedReservation.advancePaid || 0,
+                        balanceAmount: Math.max(0, Number(selectedReservation.totalAmount) - Number(selectedReservation.advancePaid || 0)),
+                        bookingId: selectedReservation.bookingId || selectedReservation.id,
+                      });
+                      if (selectedReservation.id) {
+                        ApiClient.sendWhatsAppNotification(selectedReservation.id).catch(() => {});
+                      }
+                    }}
+                  >
+                    <Text style={styles.detailWaText}>💬 WhatsApp</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
                     style={styles.viewFolioBtn}
                     onPress={() => {
                       const resId = selectedReservation.id;
@@ -837,7 +1159,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                       }
                     }}
                   >
-                    <Text style={styles.viewFolioText}>View Billing Folio ➔</Text>
+                    <Text style={styles.viewFolioText}>Billing Folio ➔</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -865,6 +1187,72 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             setBaseDate(d);
           }
           setShowDatePicker(false);
+        }}
+      />
+      {/* 5. Navigation Drawer Menu */}
+      <NavigationDrawer
+        visible={showNavigationDrawer}
+        onClose={() => setShowNavigationDrawer(false)}
+        onLogout={onLogout}
+        propertyName={propertyName}
+        ownerName={property?.user?.name || 'Hotel Owner'}
+        onSelectMenuItem={(id: DrawerMenuItemId) => {
+          switch (id) {
+            case 'bookings':
+            case 'booking_report':
+              if (onOpenBookings) {
+                onOpenBookings();
+              } else {
+                setViewMode('weekly');
+              }
+              break;
+            case 'rooms':
+              if (onOpenRooms) {
+                onOpenRooms();
+              } else {
+                setShowAddRoomModal(true);
+              }
+              break;
+            case 'support':
+              if (onOpenSupport) {
+                onOpenSupport();
+              } else {
+                Linking.openURL('mailto:adwaitakamble007@gmail.com');
+              }
+              break;
+            case 'invoice_settings':
+            case 'tax_settings':
+              if (onNavigateTab) onNavigateTab('invoicing');
+              break;
+            case 'additional_services':
+              if (onNavigateTab) onNavigateTab('housekeeping');
+              break;
+            case 'my_team':
+              if (onOpenMyTeam) {
+                onOpenMyTeam();
+              } else if (onNavigateTab) {
+                onNavigateTab('housekeeping');
+              }
+              break;
+            case 'password_change':
+              if (onOpenChangePassword) {
+                onOpenChangePassword();
+              }
+              break;
+            case 'webapp':
+              Linking.openURL('https://simplybooking.com');
+              break;
+            case 'support':
+              Linking.openURL('mailto:support@simplybooking.com');
+              break;
+            default:
+              if (Platform.OS === 'web') {
+                window.alert(`Selected Simply booking Menu Item: ${id.replace(/_/g, ' ')}`);
+              } else {
+                Alert.alert('Simply booking Feature', `Opened ${id.replace(/_/g, ' ').toUpperCase()} section.`);
+              }
+              break;
+          }
         }}
       />
     </View>
@@ -1040,23 +1428,48 @@ const styles = StyleSheet.create({
   },
   leftRoomCell: {
     height: ROW_HEIGHT,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderRightWidth: 1,
     borderColor: '#E2E8F0',
   },
+  roomHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   roomNumberText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#718096',
+    fontWeight: '800',
+    color: '#0066FF',
   },
-  roomCategoryText: {
-    fontSize: 14,
+  deleteRoomBtn: {
+    padding: 2,
+    borderRadius: 4,
+  },
+  deleteRoomBtnText: {
+    fontSize: 11,
+    opacity: 0.7,
+  },
+  roomCategoryNameText: {
+    fontSize: 10,
     fontWeight: '700',
-    color: '#1A202C',
-    marginTop: 2,
+    color: '#334155',
+    marginTop: 1,
+  },
+  roomPriceTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#15803d',
+    marginTop: 1,
+  },
+  roomSizeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#64748b',
+    marginTop: 1,
   },
   // Right Scrollable Matrix
   rightHorizontalScroll: {
@@ -1364,6 +1777,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 6,
   },
+  inlineCatFormBox: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 10,
+    padding: 12,
+    marginVertical: 8,
+  },
+  inlineCatTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1e40af',
+    marginBottom: 6,
+  },
+  saveCatBtn: {
+    backgroundColor: '#0066FF',
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 6,
+    marginTop: 10,
+  },
+  saveCatBtnText: {
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: 11,
+  },
   catOptionChip: {
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -1552,11 +1991,23 @@ const styles = StyleSheet.create({
   },
   detailActionRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     marginTop: 14,
   },
+  detailWaBtn: {
+    flex: 1.2,
+    backgroundColor: '#25D366',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  detailWaText: {
+    color: '#ffffff',
+    fontWeight: '800',
+    fontSize: 12,
+  },
   viewFolioBtn: {
-    flex: 1.5,
+    flex: 1.3,
     backgroundColor: '#0066FF',
     paddingVertical: 10,
     borderRadius: 8,

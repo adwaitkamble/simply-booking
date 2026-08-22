@@ -15,11 +15,16 @@ import type {
   RegisterPayload,
   LoginPayload,
   AuthResponse,
+  UserDTO,
+  CreateTeamMemberPayload,
+  UpdateTeamMemberPayload,
 } from '@hotel-pms/types';
 
 export interface AvailableRoomItem {
   id: string;
   roomNumber: string;
+  pricePerNight?: number | null;
+  roomSize?: string | null;
   status: RoomStatus;
   roomCategoryId: string;
   createdAt: string;
@@ -145,6 +150,31 @@ function getRequestHeaders(customHeaders: Record<string, string> = {}): Record<s
   return headers;
 }
 
+async function safeParseJsonResponse(res: Response): Promise<any> {
+  const contentType = res.headers.get('content-type') || '';
+  const text = await res.text();
+
+  let json: any = null;
+  if (contentType.includes('application/json') || text.trim().startsWith('{') || text.trim().startsWith('[')) {
+    try {
+      json = JSON.parse(text);
+    } catch {
+      // Non-JSON format
+    }
+  }
+
+  if (!res.ok) {
+    const errorMsg = json?.error || (text ? text.replace(/<[^>]*>/g, '').trim().slice(0, 150) : `HTTP Error ${res.status}`);
+    throw new ApiError(errorMsg || `Server error (${res.status})`, res.status);
+  }
+
+  if (!json) {
+    throw new ApiError(`Invalid server response format (${res.status})`, res.status);
+  }
+
+  return json;
+}
+
 export const ApiClient = {
   setBaseUrl(url: string) {
     customApiBaseUrl = url;
@@ -209,6 +239,77 @@ export const ApiClient = {
     if (json.token) {
       ApiClient.setAuthToken(json.token);
     }
+    return json;
+  },
+
+  /**
+   * Change user password securely
+   */
+  async changePassword(payload: {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+  }): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${resolveApiBaseUrl()}/auth/change-password`, {
+      method: 'POST',
+      headers: getRequestHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return json;
+  },
+
+  /**
+   * Fetch all team members for property
+   */
+  async fetchTeamMembers(): Promise<UserDTO[]> {
+    const res = await fetch(`${resolveApiBaseUrl()}/team`, {
+      headers: getRequestHeaders(),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return json.data || [];
+  },
+
+  /**
+   * Create new team member (Admin only)
+   */
+  async createTeamMember(payload: CreateTeamMemberPayload): Promise<UserDTO> {
+    const res = await fetch(`${resolveApiBaseUrl()}/team/create-member`, {
+      method: 'POST',
+      headers: getRequestHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return json.data;
+  },
+
+  /**
+   * Update team member permissions & status (Admin only)
+   */
+  async updateTeamMember(id: string, payload: UpdateTeamMemberPayload): Promise<UserDTO> {
+    const res = await fetch(`${resolveApiBaseUrl()}/team/${id}`, {
+      method: 'PUT',
+      headers: getRequestHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return json.data;
+  },
+
+  /**
+   * Delete team member (Admin only)
+   */
+  async deleteTeamMember(id: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${resolveApiBaseUrl()}/team/${id}`, {
+      method: 'DELETE',
+      headers: getRequestHeaders(),
+    });
+
+    const json = await safeParseJsonResponse(res);
     return json;
   },
 
@@ -282,6 +383,197 @@ export const ApiClient = {
     }
 
     return json.data;
+  },
+
+  /**
+   * Delete a room by ID
+   */
+  async deleteRoom(roomId: string): Promise<any> {
+    const res = await fetch(`${resolveApiBaseUrl()}/rooms/${roomId}`, {
+      method: 'DELETE',
+      headers: getRequestHeaders(),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return json.data;
+  },
+
+  /**
+   * Fetch UI-mapped bookings with date overlap filtering
+   */
+  async fetchBookings(startDate?: string, endDate?: string): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+
+    const queryStr = params.toString() ? `?${params.toString()}` : '';
+    const baseUrl = resolveApiBaseUrl();
+
+    let res: Response;
+    try {
+      res = await fetch(`${baseUrl}/bookings${queryStr}`, {
+        headers: getRequestHeaders(),
+      });
+      if (res.status === 404) {
+        res = await fetch(`${baseUrl}/reservations${queryStr}`, {
+          headers: getRequestHeaders(),
+        });
+      }
+    } catch {
+      res = await fetch(`${baseUrl}/reservations${queryStr}`, {
+        headers: getRequestHeaders(),
+      });
+    }
+
+    const json = await safeParseJsonResponse(res);
+    return json.data || [];
+  },
+
+  /**
+   * Send WhatsApp booking confirmation notification
+   */
+  async sendWhatsAppNotification(reservationId: string): Promise<any> {
+    const res = await fetch(`${resolveApiBaseUrl()}/reservations/${reservationId}/whatsapp`, {
+      method: 'POST',
+      headers: getRequestHeaders(),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return json;
+  },
+
+  /**
+   * Fetch rooms inventory data with stats { total, used } and mapped room cards
+   */
+  async fetchRoomsData(): Promise<{
+    stats: { total: number; used: number };
+    rooms: Array<{
+      roomId: string;
+      imageUrl: string;
+      categoryName: string;
+      roomName: string;
+      status: string;
+      childCount: number;
+      adultCount: number;
+    }>;
+  }> {
+    const res = await fetch(`${resolveApiBaseUrl()}/rooms`, {
+      headers: getRequestHeaders(),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return {
+      stats: json.stats || { total: 0, used: 0 },
+      rooms: json.rooms || [],
+    };
+  },
+
+  /**
+   * ==========================================
+   * MY TEAM MEMBER APIS
+   * ==========================================
+   */
+
+  /**
+   * Fetch team members and subscription limits
+   */
+  async fetchTeamData(): Promise<{
+    stats: { used: number; limit: number; isLimitReached: boolean };
+    members: Array<{
+      id: string;
+      name: string;
+      email: string;
+      role: 'Admin' | 'Staff';
+      isActive: boolean;
+      isPrimaryOwner: boolean;
+    }>;
+  }> {
+    const res = await fetch(`${resolveApiBaseUrl()}/team`, {
+      headers: getRequestHeaders(),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return {
+      stats: json.stats || { used: 0, limit: 2, isLimitReached: false },
+      members: json.members || [],
+    };
+  },
+
+  /**
+   * Toggle team member active/inactive status
+   */
+  async updateMemberStatus(memberId: string, isActive: boolean): Promise<any> {
+    const res = await fetch(`${resolveApiBaseUrl()}/team/${memberId}/status`, {
+      method: 'PATCH',
+      headers: getRequestHeaders(),
+      body: JSON.stringify({ isActive }),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return json.data;
+  },
+
+
+
+  /**
+   * Invite/Add new team member
+   */
+  async inviteTeamMember(memberData: {
+    name: string;
+    email: string;
+    role: 'Admin' | 'Staff';
+  }): Promise<any> {
+    const res = await fetch(`${resolveApiBaseUrl()}/team/invite`, {
+      method: 'POST',
+      headers: getRequestHeaders(),
+      body: JSON.stringify(memberData),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return json.member;
+  },
+
+  /**
+   * Create a new room category dynamically
+   */
+  async createRoomCategory(data: {
+    name: string;
+    description?: string;
+    basePrice: number;
+  }): Promise<any> {
+    const res = await fetch(`${resolveApiBaseUrl()}/rooms/categories`, {
+      method: 'POST',
+      headers: getRequestHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return json.data;
+  },
+
+  /**
+   * Delete a room category by ID
+   */
+  async deleteRoomCategory(categoryId: string): Promise<any> {
+    const res = await fetch(`${resolveApiBaseUrl()}/rooms/categories/${categoryId}`, {
+      method: 'DELETE',
+      headers: getRequestHeaders(),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return json.data;
+  },
+
+  /**
+   * Fetch all room categories for tenant property
+   */
+  async fetchRoomCategories(): Promise<any[]> {
+    const res = await fetch(`${resolveApiBaseUrl()}/rooms/categories`, {
+      headers: getRequestHeaders(),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return json.data || [];
   },
 
   /**
