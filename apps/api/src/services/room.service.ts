@@ -438,21 +438,36 @@ export class RoomService {
 
     if (room.reservations.length > 0) {
       const error: any = new Error(
-        `Cannot delete Room #${room.roomNumber} because it has active or upcoming reservations. Please cancel or reassign reservations first.`
+        `Cannot remove Room #${room.roomNumber} because it currently has active or upcoming guest reservations. Please cancel or reassign those reservations first.`
       );
       error.statusCode = 400;
       throw error;
     }
 
-    // Delete status logs & room in an atomic transaction
-    await prisma.$transaction(async (tx) => {
-      await tx.roomStatusLogs.deleteMany({
-        where: { roomId },
+    try {
+      // Delete status logs, linked reservations, and room in an atomic transaction
+      await prisma.$transaction(async (tx) => {
+        // Delete linked reservations history for this room to avoid foreign key restrict errors
+        await tx.reservations.deleteMany({
+          where: { roomId },
+        });
+        await tx.roomStatusLogs.deleteMany({
+          where: { roomId },
+        });
+        await tx.rooms.delete({
+          where: { id: roomId },
+        });
       });
-      await tx.rooms.delete({
-        where: { id: roomId },
-      });
-    });
+    } catch (dbErr: any) {
+      if (dbErr.code === 'P2003' || dbErr.message?.includes('23001') || dbErr.message?.includes('foreign key constraint')) {
+        const error: any = new Error(
+          `Cannot remove Room #${room.roomNumber} because active reservations are linked to it in PostgreSQL.`
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+      throw dbErr;
+    }
 
     // Notify connected clients of room status/matrix change
     emitRoomStatusUpdated({
