@@ -25,5 +25,9 @@
     "prisma": "^6.3.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "expo-application": "^57.0.2",
+    "expo-constants": "^57.0.13"
   }
 }
