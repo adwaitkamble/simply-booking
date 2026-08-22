@@ -1,11 +1,17 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { ApiClient } from '../api/client';
 
-// 1. Configure Foreground Notification Handler safely
-if (Platform.OS !== 'web') {
+// Detect if running inside Expo Go client app (SDK 53+ removed push token registration from Expo Go)
+const isExpoGo =
+  (Constants as any)?.executionEnvironment === ExecutionEnvironment.StoreClient ||
+  (Constants as any)?.executionEnvironment === 'storeClient' ||
+  (Constants as any)?.appOwnership === 'expo';
+
+// 1. Configure Foreground Notification Handler safely (skip in Expo Go or Web to prevent SDK 53 errors)
+if (Platform.OS !== 'web' && !isExpoGo) {
   try {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
@@ -17,7 +23,7 @@ if (Platform.OS !== 'web') {
       }),
     });
   } catch {
-    // Ignore web/unsupported environment error
+    // Ignore unsupported environment error
   }
 }
 
@@ -32,8 +38,16 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     return null;
   }
 
+  // SDK 53+: Expo Go no longer supports remote push token registration. Development build required.
+  if (isExpoGo) {
+    console.log(
+      'ℹ️ Expo Go app detected (SDK 53+). Remote push notifications require a standalone or development build. Skipping token registration.'
+    );
+    return null;
+  }
+
   if (!Device.isDevice) {
-    console.log('ℹ️ Push notifications require a physical device or Expo Go app on mobile.');
+    console.log('ℹ️ Push notifications require a physical device.');
   }
 
   try {
@@ -64,8 +78,8 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     if (token) {
       await ApiClient.savePushToken(token);
     }
-  } catch (err) {
-    console.warn('Notice registering for push notifications:', err);
+  } catch (err: any) {
+    console.warn('Notice registering for push notifications:', err?.message || err);
   }
 
   // Android Notification Channel Setup
