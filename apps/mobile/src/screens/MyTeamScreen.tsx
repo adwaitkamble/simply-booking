@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -58,6 +58,16 @@ export const MyTeamScreen: React.FC<MyTeamScreenProps> = ({ onBack, onOpenEditUs
       setIsRefreshing(false);
     }
   }, []);
+
+  const sortedMembers = useMemo(() => {
+    return [...members].sort((a, b) => {
+      const aIsAdmin = a.role === 'Admin' || a.isPrimaryOwner || a.email.toLowerCase() === 'adwaitakamble007@gmail.com';
+      const bIsAdmin = b.role === 'Admin' || b.isPrimaryOwner || b.email.toLowerCase() === 'adwaitakamble007@gmail.com';
+      if (aIsAdmin && !bIsAdmin) return -1;
+      if (!aIsAdmin && bIsAdmin) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [members]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -181,7 +191,7 @@ export const MyTeamScreen: React.FC<MyTeamScreenProps> = ({ onBack, onOpenEditUs
         </View>
       ) : (
         <FlatList
-          data={members}
+          data={sortedMembers}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           refreshControl={

@@ -158,7 +158,10 @@ export class TeamService {
   static async listMembers(propertyId: string): Promise<UserDTO[]> {
     const users = await prisma.users.findMany({
       where: { propertyId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [
+        { role: 'asc' },
+        { name: 'asc' },
+      ],
     });
 
     return users.map((u) => ({

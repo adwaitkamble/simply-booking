@@ -59,8 +59,10 @@ export const TeamMemberCard: React.FC<TeamMemberCardProps> = ({
     }
   };
 
+  const isAdminMember = role === 'Admin' || isPrimaryOwner || email.toLowerCase() === 'adwaitakamble007@gmail.com';
+
   return (
-    <View style={styles.cardContainer}>
+    <View style={[styles.cardContainer, isAdminMember && styles.primaryAdminCard]}>
       <View style={styles.leftInfoCol}>
         {/* Top Row: Name + Role Badge */}
         <View style={styles.nameRow}>
@@ -71,16 +73,16 @@ export const TeamMemberCard: React.FC<TeamMemberCardProps> = ({
           <View
             style={[
               styles.roleBadge,
-              role === 'Admin' ? styles.adminBadge : styles.staffBadge,
+              isAdminMember ? styles.adminBadge : styles.staffBadge,
             ]}
           >
             <Text
               style={[
                 styles.roleBadgeText,
-                role === 'Admin' ? styles.adminBadgeText : styles.staffBadgeText,
+                isAdminMember ? styles.adminBadgeText : styles.staffBadgeText,
               ]}
             >
-              {role}
+              {isAdminMember ? '👑 Primary Admin' : 'Staff'}
             </Text>
           </View>
         </View>
@@ -137,6 +139,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     ...shadows.card,
+  },
+  primaryAdminCard: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#F59E0B',
+    borderWidth: 1.5,
   },
   leftInfoCol: {
     flex: 1,
