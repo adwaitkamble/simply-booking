@@ -62,6 +62,13 @@ export const Navigator: React.FC = () => {
     focusedCalendarDate: undefined,
   });
 
+  // Register Push Notifications on launch when authenticated (Hook declared before early returns)
+  useEffect(() => {
+    if (isAuthenticated) {
+      registerForPushNotificationsAsync();
+    }
+  }, [isAuthenticated]);
+
   // Handle Loading Session State
   if (isLoading) {
     return (
@@ -171,12 +178,7 @@ export const Navigator: React.FC = () => {
     }));
   };
 
-  // Register Push Notifications on launch when authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
-      registerForPushNotificationsAsync();
-    }
-  }, [isAuthenticated]);
+
 
   const navigateToNotifications = () => {
     setNavState((prev) => ({
