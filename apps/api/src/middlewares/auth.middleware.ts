@@ -16,8 +16,7 @@ declare global {
 }
 
 /**
- * Authentication Middleware: Enforces JWT verification & injects tenant context.
- * Provides seamless fallback to default property owner context if token is missing/expired.
+ * Authentication Middleware: Enforces JWT verification & injects live tenant context from DB.
  */
 export const authenticateUser = async (
   req: Request,
@@ -30,8 +29,31 @@ export const authenticateUser = async (
     const token = authHeader.split(' ')[1];
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as AuthUserPayload;
-      if (decoded && decoded.userId && decoded.propertyId) {
-        req.user = decoded;
+      if (decoded && decoded.userId) {
+        // Fetch current user from database to ensure fresh role and permissions
+        const dbUser = await prisma.users.findUnique({
+          where: { id: decoded.userId },
+        });
+
+        if (dbUser) {
+          req.user = {
+            userId: dbUser.id,
+            email: dbUser.email,
+            name: dbUser.name,
+            role: (dbUser.role as any) || 'Admin',
+            isActive: dbUser.isActive ?? true,
+            permissions: (dbUser.permissions as any) || null,
+            propertyId: dbUser.propertyId,
+            propertyName: decoded.propertyName || 'Hotel Property',
+          };
+        } else {
+          req.user = {
+            ...decoded,
+            role: decoded.role || 'Admin',
+            isActive: decoded.isActive ?? true,
+          };
+        }
+
         next();
         return;
       }
@@ -40,6 +62,7 @@ export const authenticateUser = async (
     }
   }
 
+  // Fallback to primary owner user if no token provided
   try {
     const defaultProp = await PropertyService.getDefaultProperty();
     const ownerUser = await prisma.users.findFirst({

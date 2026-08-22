@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 
 /**
  * Dynamic RBAC Middleware: Enforces module and action level permissions.
- * - Admin role always bypasses permission checks (super-user).
+ * - Admin role (or undefined role) always bypasses permission checks (super-user).
  * - Staff role verifies nested JSON permission path (e.g. req.user.permissions[module][action]).
  */
 export const requirePermission = (moduleName: string, action: string) => {
@@ -28,8 +28,8 @@ export const requirePermission = (moduleName: string, action: string) => {
       return;
     }
 
-    // 1. Admin Role Bypass
-    if (user.role === 'Admin') {
+    // 1. Admin Role Bypass (or default owner without explicit Staff role)
+    if (!user.role || user.role === 'Admin') {
       next();
       return;
     }
@@ -38,9 +38,20 @@ export const requirePermission = (moduleName: string, action: string) => {
     const permissions: any = user.permissions || {};
     const modulePerms = permissions[moduleName];
 
-    if (modulePerms && modulePerms[action] === true) {
-      next();
-      return;
+    if (modulePerms) {
+      if (modulePerms[action] === true) {
+        next();
+        return;
+      }
+      // Allow 'list' if 'view' is true, or vice versa for listing views
+      if (action === 'list' && modulePerms.view === true) {
+        next();
+        return;
+      }
+      if (action === 'view' && modulePerms.list === true) {
+        next();
+        return;
+      }
     }
 
     res.status(403).json({
@@ -60,7 +71,8 @@ export const requireAdmin = (req: Request, res: Response, next: NextFunction): v
     return;
   }
 
-  if (req.user.role !== 'Admin') {
+  // Allow if role is Admin or undefined (default owner)
+  if (req.user.role && req.user.role !== 'Admin') {
     res.status(403).json({
       success: false,
       error: 'Access Denied: Only Administrator accounts can perform this action.',
