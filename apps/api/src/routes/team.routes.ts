@@ -15,10 +15,12 @@ teamRouter.use(authenticateUser);
 teamRouter.get('/', requirePermission('team', 'list'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const propertyId = req.user!.propertyId;
-    const members = await TeamService.listMembers(propertyId);
+    const teamData = await TeamService.getTeamData(propertyId);
     res.json({
       success: true,
-      data: members,
+      stats: teamData.stats,
+      members: teamData.members,
+      data: teamData.members,
     });
   } catch (err) {
     next(err);

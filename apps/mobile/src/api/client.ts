@@ -536,9 +536,22 @@ export const ApiClient = {
     });
 
     const json = await safeParseJsonResponse(res);
+    const rawMembers = Array.isArray(json.members)
+      ? json.members
+      : Array.isArray(json.data)
+      ? json.data
+      : [];
+
     return {
-      stats: json.stats || { used: 0, limit: 2, isLimitReached: false },
-      members: json.members || [],
+      stats: json.stats || { used: rawMembers.length, limit: 50, isLimitReached: false },
+      members: rawMembers.map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        email: m.email,
+        role: m.role || 'Staff',
+        isActive: m.isActive ?? true,
+        isPrimaryOwner: m.role === 'Admin',
+      })),
     };
   },
 
