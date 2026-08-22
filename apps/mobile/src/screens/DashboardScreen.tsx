@@ -1240,12 +1240,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 onOpenChangePassword();
               }
               break;
-            case 'webapp':
-              Linking.openURL('https://simplybooking.com');
-              break;
-            case 'support':
-              Linking.openURL('mailto:support@simplybooking.com');
-              break;
             default:
               if (Platform.OS === 'web') {
                 window.alert(`Selected Simply booking Menu Item: ${id.replace(/_/g, ' ')}`);

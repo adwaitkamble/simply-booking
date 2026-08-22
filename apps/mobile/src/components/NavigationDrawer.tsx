@@ -27,7 +27,6 @@ export type DrawerMenuItemId =
   | 'password_change'
   | 'subscriptions'
   | 'support'
-  | 'webapp'
   | 'logout';
 
 interface MenuItemConfig {
@@ -51,7 +50,6 @@ const MENU_ITEMS: MenuItemConfig[] = [
   { id: 'password_change', label: 'Password Change', icon: '🔒' },
   { id: 'subscriptions', label: 'Subscriptions', icon: '📺' },
   { id: 'support', label: 'Support', icon: '🎧' },
-  { id: 'webapp', label: 'Simply booking Webapp', icon: '🌐', badge: 'NEW', badgeColor: '#f59e0b' },
   { id: 'logout', label: 'Log out', icon: '🚪', isDestructive: true },
 ];
 
