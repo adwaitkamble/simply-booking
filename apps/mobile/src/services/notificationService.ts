@@ -1,5 +1,4 @@
 import { Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { ApiClient } from '../api/client';
@@ -10,8 +9,21 @@ const isExpoGo =
   (Constants as any)?.executionEnvironment === 'storeClient' ||
   (Constants as any)?.appOwnership === 'expo';
 
+// Dynamic lazy module loader to prevent top-level side-effect errors (addPushTokenListener) in Expo Go
+const getNotificationsModule = () => {
+  if (Platform.OS === 'web' || isExpoGo) {
+    return null;
+  }
+  try {
+    return require('expo-notifications');
+  } catch {
+    return null;
+  }
+};
+
 // 1. Configure Foreground Notification Handler safely (skip in Expo Go or Web to prevent SDK 53 errors)
-if (Platform.OS !== 'web' && !isExpoGo) {
+const Notifications = getNotificationsModule();
+if (Notifications) {
   try {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
@@ -46,16 +58,21 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     return null;
   }
 
+  const NotificationsMod = getNotificationsModule();
+  if (!NotificationsMod) {
+    return null;
+  }
+
   if (!Device.isDevice) {
     console.log('ℹ️ Push notifications require a physical device.');
   }
 
   try {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    const { status: existingStatus } = await NotificationsMod.getPermissionsAsync();
     let finalStatus = existingStatus;
 
     if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
+      const { status } = await NotificationsMod.requestPermissionsAsync();
       finalStatus = status;
     }
 
@@ -68,7 +85,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     const projectId =
       Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
 
-    const pushTokenData = await Notifications.getExpoPushTokenAsync(
+    const pushTokenData = await NotificationsMod.getExpoPushTokenAsync(
       projectId ? { projectId } : undefined
     );
     token = pushTokenData.data;
@@ -85,9 +102,9 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
   // Android Notification Channel Setup
   if (Platform.OS === 'android') {
     try {
-      await Notifications.setNotificationChannelAsync('default', {
+      await NotificationsMod.setNotificationChannelAsync('default', {
         name: 'default',
-        importance: Notifications.AndroidImportance.MAX,
+        importance: NotificationsMod.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#0066FF',
       });
