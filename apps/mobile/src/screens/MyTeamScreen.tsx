@@ -276,7 +276,15 @@ export const MyTeamScreen: React.FC<MyTeamScreenProps> = ({ onBack, onOpenEditUs
                     styles.roleChip,
                     inviteRole === r && styles.roleChipSelected,
                   ]}
-                  onPress={() => setInviteRole(r)}
+                  onPress={() => {
+                    if (r === 'Admin' && inviteEmail.toLowerCase().trim() !== 'adwaitakamble007@gmail.com') {
+                      const msg = 'Only 1 Administrator (Adwait Kamble: adwaitakamble007@gmail.com) is allowed per hotel property.';
+                      if (Platform.OS === 'web') window.alert(msg);
+                      else Alert.alert('Single Admin Policy', msg);
+                      return;
+                    }
+                    setInviteRole(r);
+                  }}
                 >
                   <Text
                     style={[

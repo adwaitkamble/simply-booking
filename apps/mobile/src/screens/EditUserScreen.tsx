@@ -259,7 +259,16 @@ export const EditUserScreen: React.FC<EditUserScreenProps> = ({
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.rolePill, role === 'Admin' && styles.rolePillActive]}
-                  onPress={() => setRole('Admin')}
+                  onPress={() => {
+                    const isPrimary = email.toLowerCase().trim() === 'adwaitakamble007@gmail.com' || initialUser?.email?.toLowerCase() === 'adwaitakamble007@gmail.com';
+                    if (!isPrimary) {
+                      const msg = 'Only 1 Administrator (Adwait Kamble: adwaitakamble007@gmail.com) is allowed per hotel property.';
+                      if (Platform.OS === 'web') window.alert(msg);
+                      else Alert.alert('Single Admin Policy', msg);
+                      return;
+                    }
+                    setRole('Admin');
+                  }}
                   activeOpacity={0.8}
                 >
                   <Text style={[styles.rolePillText, role === 'Admin' && styles.rolePillTextActive]}>

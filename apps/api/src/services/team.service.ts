@@ -31,6 +31,21 @@ export class TeamService {
 
     const normalizedEmail = email.toLowerCase().trim();
 
+    // Enforce Single Admin Per Hotel Policy
+    if (role === 'Admin') {
+      const existingAdmin = await prisma.users.findFirst({
+        where: { propertyId, role: 'Admin' },
+      });
+
+      if (existingAdmin) {
+        const error: any = new Error(
+          'Only 1 Administrator account (adwaitakamble007@gmail.com) is allowed per hotel property. Additional team members must be assigned the Staff role.'
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+    }
+
     // Check if user already exists
     const existing = await prisma.users.findUnique({
       where: { email: normalizedEmail },
@@ -86,6 +101,24 @@ export class TeamService {
       const error: any = new Error('Team member not found in your property.');
       error.statusCode = 404;
       throw error;
+    }
+
+    if (payload.role === 'Admin') {
+      const existingAdmin = await prisma.users.findFirst({
+        where: {
+          propertyId,
+          role: 'Admin',
+          id: { not: userId },
+        },
+      });
+
+      if (existingAdmin) {
+        const error: any = new Error(
+          'Only 1 Administrator account (adwaitakamble007@gmail.com) is allowed per hotel property.'
+        );
+        error.statusCode = 400;
+        throw error;
+      }
     }
 
     const updateData: any = {};
