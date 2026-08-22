@@ -13,6 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { ApiClient } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import { TeamMemberCard, TeamMemberData } from '../components/TeamMemberCard';
 import { shadows } from '../theme';
 
@@ -23,6 +24,8 @@ interface MyTeamScreenProps {
 }
 
 export const MyTeamScreen: React.FC<MyTeamScreenProps> = ({ onBack, onOpenEditUser }) => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
   const [members, setMembers] = useState<TeamMemberData[]>([]);
   const [stats, setStats] = useState<{ used: number; limit: number; isLimitReached: boolean }>({
     used: 0,
@@ -192,21 +195,24 @@ export const MyTeamScreen: React.FC<MyTeamScreenProps> = ({ onBack, onOpenEditUs
           ListHeaderComponent={
             <View style={styles.actionToolbar}>
               <Text style={styles.sectionHeading}>Property Staff & Admins</Text>
-              <TouchableOpacity
-                style={styles.addMemberBtn}
-                onPress={() => (onOpenEditUser ? onOpenEditUser() : setShowInviteModal(true))}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.addMemberBtnText}>+ Add Member</Text>
-              </TouchableOpacity>
+              {isAdmin ? (
+                <TouchableOpacity
+                  style={styles.addMemberBtn}
+                  onPress={() => (onOpenEditUser ? onOpenEditUser() : setShowInviteModal(true))}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.addMemberBtnText}>+ Add Member</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           }
           renderItem={({ item }) => (
             <TeamMemberCard
               member={item}
+              canEdit={isAdmin}
               onToggleStatus={handleToggleStatus}
               onDelete={handleDeleteMember}
-              onEdit={onOpenEditUser ? (m) => onOpenEditUser(m) : undefined}
+              onEdit={isAdmin && onOpenEditUser ? (m) => onOpenEditUser(m) : undefined}
             />
           )}
           ListEmptyComponent={

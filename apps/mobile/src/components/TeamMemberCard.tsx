@@ -21,6 +21,7 @@ export interface TeamMemberData {
 
 interface TeamMemberCardProps {
   member: TeamMemberData;
+  canEdit?: boolean;
   onToggleStatus: (memberId: string, newActive: boolean) => void;
   onDelete: (memberId: string, memberName: string) => void;
   onEdit?: (member: TeamMemberData) => void;
@@ -28,6 +29,7 @@ interface TeamMemberCardProps {
 
 export const TeamMemberCard: React.FC<TeamMemberCardProps> = ({
   member,
+  canEdit = true,
   onToggleStatus,
   onDelete,
   onEdit,
@@ -94,11 +96,12 @@ export const TeamMemberCard: React.FC<TeamMemberCardProps> = ({
         <Switch
           value={isActive}
           onValueChange={handleToggle}
+          disabled={!canEdit}
           trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
           thumbColor={isActive ? '#0066FF' : '#94A3B8'}
         />
 
-        {onEdit && (
+        {canEdit && onEdit && (
           <TouchableOpacity
             style={styles.editBtn}
             onPress={() => onEdit(member)}
@@ -108,7 +111,7 @@ export const TeamMemberCard: React.FC<TeamMemberCardProps> = ({
           </TouchableOpacity>
         )}
 
-        {!isPrimaryOwner && (
+        {canEdit && !isPrimaryOwner && (
           <TouchableOpacity
             style={styles.deleteBtn}
             onPress={handleDeletePress}
