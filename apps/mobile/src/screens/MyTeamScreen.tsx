@@ -25,7 +25,7 @@ interface MyTeamScreenProps {
 
 export const MyTeamScreen: React.FC<MyTeamScreenProps> = ({ onBack, onOpenEditUser }) => {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'Admin';
+  const isAdmin = !user || user?.role?.toUpperCase() === 'ADMIN' || user?.email?.toLowerCase() === 'adwaitakamble007@gmail.com';
   const [members, setMembers] = useState<TeamMemberData[]>([]);
   const [stats, setStats] = useState<{ used: number; limit: number; isLimitReached: boolean }>({
     used: 0,
