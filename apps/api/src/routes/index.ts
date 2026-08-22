@@ -6,6 +6,7 @@ import { reservationRouter } from './reservation.routes.js';
 import { invoiceRouter } from './invoice.routes.js';
 import { webhookRouter } from './webhook.routes.js';
 import { teamRouter } from './team.routes.js';
+import { notificationRouter } from './notification.routes.js';
 
 export const apiRouter = Router();
 
@@ -17,3 +18,4 @@ apiRouter.use('/bookings', reservationRouter);
 apiRouter.use('/invoices', invoiceRouter);
 apiRouter.use('/webhooks', webhookRouter);
 apiRouter.use('/team', teamRouter);
+apiRouter.use('/notifications', notificationRouter);

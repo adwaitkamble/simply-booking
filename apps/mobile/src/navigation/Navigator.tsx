@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -20,14 +20,16 @@ import { MyTeamScreen } from '../screens/MyTeamScreen';
 import { EditUserScreen } from '../screens/EditUserScreen';
 import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
 import { SupportScreen } from '../screens/SupportScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { HousekeepingScreen } from '../screens/HousekeepingScreen';
 import { InvoiceScreen } from '../screens/InvoiceScreen';
 import { ChannelManagerScreen } from '../screens/ChannelManagerScreen';
+import { registerForPushNotificationsAsync } from '../services/notificationService';
 import { AvailableRoomItem } from '../api/client';
 import { shadows } from '../theme';
 
 type TabName = 'booking' | 'housekeeping' | 'invoicing' | 'channel';
-type ScreenName = 'dashboard' | 'addReservation' | 'bookings' | 'rooms' | 'myTeam' | 'editUser' | 'changePassword' | 'support' | 'housekeeping' | 'invoicing' | 'channel';
+type ScreenName = 'dashboard' | 'addReservation' | 'bookings' | 'rooms' | 'myTeam' | 'editUser' | 'changePassword' | 'support' | 'notifications' | 'housekeeping' | 'invoicing' | 'channel';
 
 interface NavigationState {
   currentTab: TabName;
@@ -169,6 +171,21 @@ export const Navigator: React.FC = () => {
     }));
   };
 
+  // Register Push Notifications on launch when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      registerForPushNotificationsAsync();
+    }
+  }, [isAuthenticated]);
+
+  const navigateToNotifications = () => {
+    setNavState((prev) => ({
+      ...prev,
+      currentTab: 'booking',
+      currentScreen: 'notifications',
+    }));
+  };
+
   const navigateToSupport = () => {
     setNavState((prev) => ({
       ...prev,
@@ -249,6 +266,7 @@ export const Navigator: React.FC = () => {
                 onOpenMyTeam={navigateToMyTeam}
                 onOpenChangePassword={navigateToChangePassword}
                 onOpenSupport={navigateToSupport}
+                onOpenNotifications={navigateToNotifications}
                 onLogout={handleLogout}
                 onNavigateTab={switchTab}
               />
@@ -287,6 +305,11 @@ export const Navigator: React.FC = () => {
             )}
             {navState.currentScreen === 'support' && (
               <SupportScreen
+                onBack={() => navigateToDashboard()}
+              />
+            )}
+            {navState.currentScreen === 'notifications' && (
+              <NotificationsScreen
                 onBack={() => navigateToDashboard()}
               />
             )}

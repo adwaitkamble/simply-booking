@@ -18,6 +18,7 @@ import type {
   UserDTO,
   CreateTeamMemberPayload,
   UpdateTeamMemberPayload,
+  NotificationDTO,
 } from '@hotel-pms/types';
 
 export interface AvailableRoomItem {
@@ -311,6 +312,48 @@ export const ApiClient = {
 
     const json = await safeParseJsonResponse(res);
     return json;
+  },
+
+  /**
+   * Save device Expo Push Token to user profile
+   */
+  async savePushToken(token: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${resolveApiBaseUrl()}/notifications/token`, {
+      method: 'POST',
+      headers: getRequestHeaders(),
+      body: JSON.stringify({ token }),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return json;
+  },
+
+  /**
+   * Fetch top 50 notifications for logged-in user
+   */
+  async fetchNotifications(): Promise<{ notifications: NotificationDTO[]; unreadCount: number }> {
+    const res = await fetch(`${resolveApiBaseUrl()}/notifications`, {
+      headers: getRequestHeaders(),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return {
+      notifications: json.data || [],
+      unreadCount: json.unreadCount || 0,
+    };
+  },
+
+  /**
+   * Mark notification as read
+   */
+  async markNotificationRead(notificationId: string): Promise<NotificationDTO> {
+    const res = await fetch(`${resolveApiBaseUrl()}/notifications/${notificationId}/read`, {
+      method: 'PATCH',
+      headers: getRequestHeaders(),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return json.data;
   },
 
   /**

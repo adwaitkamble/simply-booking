@@ -87,6 +87,14 @@ export interface ChainDTO {
 
 export type UserRole = 'Admin' | 'Staff';
 
+export type NotificationType = 'BOOKING' | 'HOUSEKEEPING' | 'SYSTEM';
+
+export const NotificationType = {
+  BOOKING: 'BOOKING' as NotificationType,
+  HOUSEKEEPING: 'HOUSEKEEPING' as NotificationType,
+  SYSTEM: 'SYSTEM' as NotificationType,
+};
+
 export interface ActionPermissions {
   create: boolean;
   edit: boolean;
@@ -105,10 +113,22 @@ export interface UserDTO {
   role: UserRole;
   isActive: boolean;
   permissions?: ModulePermissions | null;
+  pushToken?: string | null;
   propertyId: string;
   property?: PropertyDTO;
   createdAt: Date | string;
   updatedAt: Date | string;
+}
+
+export interface NotificationDTO {
+  id: string;
+  propertyId: string;
+  userId: string;
+  title: string;
+  body: string;
+  type: NotificationType;
+  isRead: boolean;
+  createdAt: Date | string;
 }
 
 export interface PropertyDTO {

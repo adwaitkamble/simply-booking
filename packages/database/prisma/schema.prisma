@@ -56,19 +56,27 @@ enum UserRole {
   Staff
 }
 
+enum NotificationType {
+  BOOKING
+  HOUSEKEEPING
+  SYSTEM
+}
+
 model Users {
-  id           String     @id @default(uuid())
-  name         String
-  email        String     @unique
-  passwordHash String
-  mobileNumber String?
-  role         UserRole   @default(Admin)
-  isActive     Boolean    @default(true)
-  permissions  Json?
-  propertyId   String
-  property     Properties @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id            String          @id @default(uuid())
+  name          String
+  email         String          @unique
+  passwordHash  String
+  mobileNumber  String?
+  role          UserRole        @default(Admin)
+  isActive      Boolean         @default(true)
+  permissions   Json?
+  pushToken     String?
+  propertyId    String
+  property      Properties      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  notifications Notifications[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   @@map("Users")
 }
@@ -87,8 +95,24 @@ model Properties {
   updatedAt      DateTime         @updatedAt
   users          Users[]
   roomCategories RoomCategories[]
+  notifications  Notifications[]
 
   @@map("Properties")
+}
+
+model Notifications {
+  id         String           @id @default(uuid())
+  propertyId String
+  property   Properties       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  userId     String
+  user       Users            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String
+  body       String
+  type       NotificationType @default(SYSTEM)
+  isRead     Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+
+  @@map("Notifications")
 }
 
 model RoomCategories {

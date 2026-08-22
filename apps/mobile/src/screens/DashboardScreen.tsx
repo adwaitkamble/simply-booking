@@ -20,6 +20,7 @@ import { RoomStatus } from '@hotel-pms/types';
 import { borderRadius, shadows } from '../theme';
 import { GoogleCalendarDatePickerModal } from '../components/GoogleCalendarDatePickerModal';
 import { NavigationDrawer, DrawerMenuItemId } from '../components/NavigationDrawer';
+import { NotificationBell } from '../components/NotificationBell';
 import { sendWhatsAppConfirmation } from '../utils/whatsapp';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -43,6 +44,7 @@ interface DashboardScreenProps {
   onOpenMyTeam?: () => void;
   onOpenChangePassword?: () => void;
   onOpenSupport?: () => void;
+  onOpenNotifications?: () => void;
   onLogout?: () => void;
   onNavigateTab?: (tab: 'booking' | 'housekeeping' | 'invoicing' | 'channel') => void;
 }
@@ -57,6 +59,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onOpenMyTeam,
   onOpenChangePassword,
   onOpenSupport,
+  onOpenNotifications,
   onLogout,
   onNavigateTab,
 }) => {
@@ -548,9 +551,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <TouchableOpacity style={styles.headerActionBtn} onPress={handleRefresh} activeOpacity={0.7}>
               <Text style={styles.headerActionText}>🔄</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.headerActionBtn} onPress={() => Linking.openURL('https://calendar.google.com')} activeOpacity={0.7}>
-              <Text style={styles.headerActionText}>🔔</Text>
-            </TouchableOpacity>
+            <NotificationBell onPress={() => (onOpenNotifications ? onOpenNotifications() : undefined)} />
           </View>
         </View>
 
