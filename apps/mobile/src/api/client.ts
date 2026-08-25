@@ -103,11 +103,7 @@ function resolveApiBaseUrl(): string {
     return customApiBaseUrl;
   }
 
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
-  }
-
-  // Extract host IP from Expo Metro bundler connection (e.g. 192.168.x.x:8081)
+  // 1. Prioritize dynamic Metro bundler host IP (e.g. 192.168.0.101:8081) for real devices & Expo Go
   try {
     const Constants = require('expo-constants')?.default || require('expo-constants');
     const hostUri =
@@ -126,18 +122,22 @@ function resolveApiBaseUrl(): string {
     // Expo constants not available in node test environment
   }
 
-  // Fallback for Android Emulator (10.0.2.2 maps to host 127.0.0.1)
+  // 2. Use EXPO_PUBLIC_API_URL if configured
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+
+  // 3. Fallback for Android Emulator (10.0.2.2 maps to host 127.0.0.1)
   try {
     const RN = require('react-native');
     if (RN?.Platform?.OS === 'android') {
-      return 'http://10.0.2.2:4000/api';
+      return 'http://192.168.0.101:4000/api';
     }
   } catch {
     // React Native not available in node test runner
   }
 
-  // Fallback for iOS Simulator / Web / Local tests
-  return 'http://localhost:4000/api';
+  return 'http://192.168.0.101:4000/api';
 }
 
 function getRequestHeaders(customHeaders: Record<string, string> = {}): Record<string, string> {

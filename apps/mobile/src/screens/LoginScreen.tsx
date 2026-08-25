@@ -46,6 +46,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
     }
   };
 
+  const fillAdminCredentials = () => {
+    setEmail('adwaitakamble007@gmail.com');
+    setPassword('Sondev@1234');
+    setErrorMessage(null);
+  };
+
   const fillDemoCredentials = () => {
     setEmail('demo@simplybooking.com');
     setPassword('password123');
@@ -157,13 +163,21 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
               )}
             </TouchableOpacity>
 
-            {/* Quick Demo Fill Helper */}
+            {/* Quick Auto-fill Helpers */}
+            <TouchableOpacity
+              style={[styles.demoHelper, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}
+              onPress={fillAdminCredentials}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.demoHelperText, { color: '#B45309' }]}>👑 Auto-fill Primary Admin (adwaitakamble007@gmail.com)</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.demoHelper}
               onPress={fillDemoCredentials}
               activeOpacity={0.7}
             >
-              <Text style={styles.demoHelperText}>⚡ Auto-fill Pune Resort Demo Account</Text>
+              <Text style={styles.demoHelperText}>⚡ Auto-fill Pune Resort Staff Demo Account</Text>
             </TouchableOpacity>
 
             {/* Register Footer */}
