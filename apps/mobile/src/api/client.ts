@@ -358,10 +358,7 @@ export const ApiClient = {
       headers: getRequestHeaders(),
     });
 
-    const json = await res.json();
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Failed to fetch user session', res.status);
-    }
+    const json = await safeParseJsonResponse(res);
     return json.data;
   },
 

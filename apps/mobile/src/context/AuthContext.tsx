@@ -58,9 +58,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               }
               await SafeStorage.setItem(USER_KEY, JSON.stringify(meData));
             }
-          } catch (meErr) {
-            console.warn('⚠️ Session token expired or invalid, clearing auth session');
-            await clearSession();
+          } catch (meErr: any) {
+            if (meErr?.statusCode === 401) {
+              console.warn('⚠️ Session token expired (401), clearing auth session');
+              await clearSession();
+            }
           }
         }
       } catch (err) {
