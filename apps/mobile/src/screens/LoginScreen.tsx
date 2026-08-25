@@ -38,7 +38,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
   const [resetError, setResetError] = useState<string | null>(null);
 
   const openForgotModal = () => {
-    setResetEmail(email.trim() || 'adwaitakamble007@gmail.com');
+    setResetEmail(email.trim());
     setResetNewPassword('');
     setResetConfirmPassword('');
     setResetError(null);
@@ -100,18 +100,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
     } finally {
       setLoading(false);
     }
-  };
-
-  const fillAdminCredentials = () => {
-    setEmail('adwaitakamble007@gmail.com');
-    setPassword('Sondev@1234');
-    setErrorMessage(null);
-  };
-
-  const fillDemoCredentials = () => {
-    setEmail('demo@simplybooking.com');
-    setPassword('password123');
-    setErrorMessage(null);
   };
 
   return (
@@ -225,23 +213,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onNavigateToRegister }
               ) : (
                 <Text style={styles.primaryButtonText}>Sign In</Text>
               )}
-            </TouchableOpacity>
-
-            {/* Quick Auto-fill Helpers */}
-            <TouchableOpacity
-              style={[styles.demoHelper, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}
-              onPress={fillAdminCredentials}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.demoHelperText, { color: '#B45309' }]}>👑 Auto-fill Primary Admin (adwaitakamble007@gmail.com)</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.demoHelper}
-              onPress={fillDemoCredentials}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.demoHelperText}>⚡ Auto-fill Pune Resort Staff Demo Account</Text>
             </TouchableOpacity>
 
             {/* Register Footer */}
