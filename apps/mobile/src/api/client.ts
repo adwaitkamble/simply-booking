@@ -213,10 +213,7 @@ export const ApiClient = {
       body: JSON.stringify(payload),
     });
 
-    const json = await res.json();
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Registration failed', res.status);
-    }
+    const json = await safeParseJsonResponse(res);
     if (json.token) {
       ApiClient.setAuthToken(json.token);
     }
@@ -233,10 +230,7 @@ export const ApiClient = {
       body: JSON.stringify(payload),
     });
 
-    const json = await res.json();
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Login failed', res.status);
-    }
+    const json = await safeParseJsonResponse(res);
     if (json.token) {
       ApiClient.setAuthToken(json.token);
     }
