@@ -256,6 +256,20 @@ export const ApiClient = {
   },
 
   /**
+   * Self-service Reset Password (Forgot Password flow)
+   */
+  async resetPassword(payload: { email: string; newPassword: string }): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${resolveApiBaseUrl()}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const json = await safeParseJsonResponse(res);
+    return json;
+  },
+
+  /**
    * Fetch all team members for property
    */
   async fetchTeamMembers(): Promise<UserDTO[]> {

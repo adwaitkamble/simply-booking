@@ -60,3 +60,16 @@ authRouter.post('/change-password', authenticateUser, async (req: Request, res: 
     next(err);
   }
 });
+
+/**
+ * POST /api/auth/reset-password
+ * Self-service Forgot Password reset
+ */
+authRouter.post('/reset-password', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await AuthService.resetPassword(req.body);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});

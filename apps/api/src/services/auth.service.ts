@@ -359,7 +359,51 @@ export class AuthService {
 
     return {
       success: true,
-      message: 'Password changed successfully',
+      message: 'Password changed successfully.',
+    };
+  }
+
+  /**
+   * Reset user password via Forgot Password self-service flow
+   */
+  static async resetPassword(payload: { email: string; newPassword: string }) {
+    const { email, newPassword } = payload;
+
+    if (!email || !newPassword) {
+      const error: any = new Error('Email address and new password are required.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (newPassword.length < 6) {
+      const error: any = new Error('New password must be at least 6 characters long.');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const user = await prisma.users.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (!user) {
+      const error: any = new Error('No account found registered with this email address.');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    await prisma.users.update({
+      where: { id: user.id },
+      data: { passwordHash },
+    });
+
+    return {
+      success: true,
+      message: 'Password reset successfully in database! You can now log in with your new password.',
     };
   }
 }
