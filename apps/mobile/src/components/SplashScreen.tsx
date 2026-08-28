@@ -52,9 +52,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
         translucent={Platform.OS === 'android'}
       />
 
-      {/* Full Bleed Splash Screen Image - Fills the entire screen with 0 outer frame */}
+      {/* Full Bleed Splash Screen Image */}
       <Animated.Image
-        source={require('../../assets/splash_card.png')}
+        source={require('../../assets/splash.png')}
         style={[
           styles.splashImage,
           {

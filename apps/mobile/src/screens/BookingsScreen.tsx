@@ -36,7 +36,7 @@ export const BookingsScreen: React.FC<BookingsScreenProps> = ({ onBack, onSelect
     try {
       setError(null);
       const data = await ApiClient.fetchBookings(startDate, endDate);
-      setBookings(data);
+      setBookings(Array.isArray(data) ? data : []);
     } catch (err: any) {
       console.warn('Failed to load bookings:', err);
       setError(err?.message || 'Failed to retrieve bookings from Postgres database');
@@ -123,7 +123,7 @@ export const BookingsScreen: React.FC<BookingsScreenProps> = ({ onBack, onSelect
       ) : (
         <FlatList
           data={bookings}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => String(item?.id || item?.bookingId || index)}
           renderItem={({ item }) => (
             <BookingCard
               booking={item}

@@ -103,7 +103,13 @@ function resolveApiBaseUrl(): string {
     return customApiBaseUrl;
   }
 
-  // 1. Prioritize dynamic Metro bundler host IP (e.g. 192.168.0.101:8081) for real devices & Expo Go
+  // 1. Use EXPO_PUBLIC_API_URL if configured (standalone builds & .env)
+  // In EAS native builds, process.env.EXPO_PUBLIC_* vars are inlined at bundle time
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+
+  // 2. During development: use Metro bundler host IP (e.g. 192.168.0.101:8081)
   try {
     const Constants = require('expo-constants')?.default || require('expo-constants');
     const hostUri =
@@ -119,24 +125,10 @@ function resolveApiBaseUrl(): string {
       }
     }
   } catch {
-    // Expo constants not available in node test environment
+    // Expo constants not available
   }
 
-  // 2. Use EXPO_PUBLIC_API_URL if configured
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
-  }
-
-  // 3. Fallback for Android Emulator (10.0.2.2 maps to host 127.0.0.1)
-  try {
-    const RN = require('react-native');
-    if (RN?.Platform?.OS === 'android') {
-      return 'http://192.168.0.101:4000/api';
-    }
-  } catch {
-    // React Native not available in node test runner
-  }
-
+  // 3. Fallback
   return 'http://192.168.0.101:4000/api';
 }
 
@@ -174,6 +166,120 @@ async function safeParseJsonResponse(res: Response): Promise<any> {
   }
 
   return json;
+}
+
+function asArray(value: any): any[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function unwrapArrayResponse(json: any, keys: string[] = []): any[] {
+  if (Array.isArray(json)) return json;
+  if (Array.isArray(json?.data)) return json.data;
+
+  for (const key of keys) {
+    if (Array.isArray(json?.[key])) return json[key];
+    if (Array.isArray(json?.data?.[key])) return json.data[key];
+  }
+
+  return [];
+}
+
+function toFiniteNumber(value: any, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toDate(value: any): Date | null {
+  const parsed = value ? new Date(value) : null;
+  return parsed && !Number.isNaN(parsed.getTime()) ? parsed : null;
+}
+
+function formatShortDate(value: any): string {
+  const date = toDate(value);
+  return date
+    ? date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+    : 'Not set';
+}
+
+function formatTimestamp(value: any): string {
+  const date = toDate(value);
+  return date
+    ? date.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      })
+    : 'Not available';
+}
+
+function normalizeBooking(raw: any, index: number): any {
+  const booking = raw && typeof raw === 'object' ? raw : {};
+  const room = booking.room || booking.rooms || {};
+  const category = room.roomCategory || room.category || booking.roomCategory || {};
+  const guest = booking.guest || booking.guests || {};
+  const counts = booking.counts || {};
+  const dates = booking.dates || {};
+  const financials = booking.financials || {};
+
+  const id = String(booking.id || booking.reservationId || `booking-${index}`);
+  const roomNumber = room.roomNumber || booking.roomNumber || 'Unassigned';
+  const categoryName = category.name || booking.categoryName || 'Standard';
+  const totalAmount = toFiniteNumber(financials.totalAmount ?? booking.totalAmount);
+  const advancePaid = toFiniteNumber(financials.advancePaid ?? booking.advancePaid);
+
+  return {
+    ...booking,
+    id,
+    bookingId: String(booking.bookingId || `#${id.replace(/-/g, '').slice(-6) || index + 1}`),
+    roomNameAndPlan:
+      booking.roomNameAndPlan || `${categoryName} Room ${roomNumber}`,
+    guestName: booking.guestName || guest.name || 'Walk-in Guest',
+    guestPhone: booking.guestPhone || guest.phone || '',
+    lastUpdatedBy: booking.lastUpdatedBy || 'Front Desk',
+    lastUpdatedTimestamp:
+      booking.lastUpdatedTimestamp || formatTimestamp(booking.updatedAt || booking.createdAt),
+    counts: {
+      rooms: toFiniteNumber(counts.rooms, 1),
+      children: toFiniteNumber(counts.children ?? booking.children),
+      adults: toFiniteNumber(counts.adults ?? booking.adults, 1),
+    },
+    dates: {
+      checkIn: dates.checkIn || formatShortDate(booking.checkIn),
+      checkOut: dates.checkOut || formatShortDate(booking.checkOut),
+      rawCheckIn: dates.rawCheckIn || toDate(booking.checkIn)?.toISOString().slice(0, 10),
+      rawCheckOut: dates.rawCheckOut || toDate(booking.checkOut)?.toISOString().slice(0, 10),
+    },
+    financials: {
+      totalAmount,
+      advancePaid,
+      balanceAmount: toFiniteNumber(
+        financials.balanceAmount,
+        Math.max(0, totalAmount - advancePaid)
+      ),
+    },
+  };
+}
+
+function normalizeRoomCard(raw: any, index: number): any {
+  const room = raw && typeof raw === 'object' ? raw : {};
+  const category = room.roomCategory || room.category || {};
+  const activeReservation = asArray(room.reservations)[0] || {};
+  const roomId = String(room.roomId || room.id || `room-${index}`);
+  const roomNumber = room.roomNumber || room.number || roomId;
+
+  return {
+    ...room,
+    roomId,
+    imageUrl: room.imageUrl || '',
+    categoryName: room.categoryName || category.name || 'Standard',
+    roomName: room.roomName || `Room ${roomNumber}`,
+    status: String(room.status || 'Unknown'),
+    childCount: toFiniteNumber(room.childCount ?? activeReservation.children),
+    adultCount: toFiniteNumber(room.adultCount ?? activeReservation.adults),
+  };
 }
 
 export const ApiClient = {
@@ -474,7 +580,7 @@ export const ApiClient = {
     }
 
     const json = await safeParseJsonResponse(res);
-    return json.data || [];
+    return unwrapArrayResponse(json, ['bookings', 'reservations']).map(normalizeBooking);
   },
 
   /**
@@ -510,9 +616,19 @@ export const ApiClient = {
     });
 
     const json = await safeParseJsonResponse(res);
+    const rawRooms = unwrapArrayResponse(json, ['rooms']);
+    const rooms = rawRooms.map(normalizeRoomCard);
+    const rawStats = json?.stats || json?.data?.stats || {};
+
     return {
-      stats: json.stats || { total: 0, used: 0 },
-      rooms: json.rooms || [],
+      stats: {
+        total: toFiniteNumber(rawStats.total, rooms.length),
+        used: toFiniteNumber(
+          rawStats.used,
+          rooms.filter((room) => ['occupied', 'dirty'].includes(room.status.toLowerCase())).length
+        ),
+      },
+      rooms,
     };
   },
 

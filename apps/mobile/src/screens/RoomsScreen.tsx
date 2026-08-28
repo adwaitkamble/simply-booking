@@ -29,8 +29,8 @@ export const RoomsScreen: React.FC<RoomsScreenProps> = ({ onBack, onSelectRoom }
     try {
       setError(null);
       const data = await ApiClient.fetchRoomsData();
-      setStats(data.stats);
-      setRooms(data.rooms);
+      setStats(data?.stats || { total: 0, used: 0 });
+      setRooms(Array.isArray(data?.rooms) ? data.rooms : []);
     } catch (err: any) {
       console.warn('Failed to load rooms data:', err);
       setError(err?.message || 'Failed to fetch rooms inventory from PostgreSQL backend');
@@ -97,7 +97,7 @@ export const RoomsScreen: React.FC<RoomsScreenProps> = ({ onBack, onSelectRoom }
       ) : (
         <FlatList
           data={rooms}
-          keyExtractor={(item) => item.roomId}
+          keyExtractor={(item, index) => String(item?.roomId || index)}
           renderItem={({ item }) => (
             <RoomCard room={item} onPress={(r) => onSelectRoom?.(r)} />
           )}

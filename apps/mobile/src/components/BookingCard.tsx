@@ -46,17 +46,22 @@ interface BookingCardProps {
 }
 
 export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPressView }) => {
+  const safeBooking = booking || ({} as BookingCardData);
   const {
-    bookingId,
-    roomNameAndPlan,
-    guestName,
-    guestPhone,
-    lastUpdatedBy,
-    lastUpdatedTimestamp,
-    counts,
-    dates,
-    financials,
-  } = booking;
+    bookingId = '#—',
+    roomNameAndPlan = 'Room not assigned',
+    guestName = 'Walk-in Guest',
+    guestPhone = '',
+    lastUpdatedBy = 'Front Desk',
+    lastUpdatedTimestamp = 'Not available',
+  } = safeBooking;
+  const counts = safeBooking.counts || { rooms: 1, children: 0, adults: 1 };
+  const dates = safeBooking.dates || { checkIn: 'Not set', checkOut: 'Not set' };
+  const financials = safeBooking.financials || {
+    totalAmount: 0,
+    advancePaid: 0,
+    balanceAmount: 0,
+  };
 
   return (
     <View style={styles.cardContainer}>

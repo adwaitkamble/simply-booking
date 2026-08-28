@@ -59,7 +59,7 @@ export const TeamMemberCard: React.FC<TeamMemberCardProps> = ({
     }
   };
 
-  const isAdminMember = role === 'Admin' || isPrimaryOwner || email.toLowerCase() === 'adwaitakamble007@gmail.com';
+  const isAdminMember = role === 'Admin' || isPrimaryOwner || (email || '').toLowerCase() === 'adwaitakamble007@gmail.com';
 
   return (
     <View style={[styles.cardContainer, isAdminMember && styles.primaryAdminCard]}>

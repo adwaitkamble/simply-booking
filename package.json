@@ -9,7 +9,6 @@
     "packages/*"
   ],
   "main": "apps/mobile/index.js",
-  "type": "module",
   "scripts": {
     "build": "npm run generate --workspace=@hotel-pms/database && npm run --workspaces --if-present build",
     "dev:api": "npm run dev --workspace=@hotel-pms/api",
@@ -26,8 +25,5 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   },
-  "dependencies": {
-    "expo-application": "^57.0.2",
-    "expo-constants": "^57.0.13"
-  }
+  "dependencies": {}
 }

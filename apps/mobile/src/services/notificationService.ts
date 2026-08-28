@@ -9,52 +9,55 @@ const isExpoGo =
   (Constants as any)?.executionEnvironment === 'storeClient' ||
   (Constants as any)?.appOwnership === 'expo';
 
-// Dynamic lazy module loader to prevent top-level side-effect errors (addPushTokenListener) in Expo Go
+// Dynamic lazy module loader — avoids top-level side-effects that crash production builds.
+// expo-notifications must never be imported at module scope in a standalone APK
+// because its native module initializes notification channels on load.
 const getNotificationsModule = () => {
   if (Platform.OS === 'web' || isExpoGo) {
     return null;
   }
   try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     return require('expo-notifications');
   } catch {
     return null;
   }
 };
 
-// 1. Configure Foreground Notification Handler safely (skip in Expo Go or Web to prevent SDK 53 errors)
-const Notifications = getNotificationsModule();
-if (Notifications) {
+// Configure foreground notification handler — called lazily, never at module top-level.
+// This is invoked once from registerForPushNotificationsAsync, not on import.
+function configureNotificationHandler() {
   try {
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      }),
-    });
-  } catch {
-    // Ignore unsupported environment error
+    const Notifications = getNotificationsModule();
+    if (Notifications && typeof Notifications.setNotificationHandler === 'function') {
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        }),
+      });
+    }
+  } catch (err) {
+    console.warn('Notice setting up notification handler:', err);
   }
 }
 
 /**
- * Register device for Expo Push Notifications & send push token to PostgreSQL backend
+ * Register device for Expo Push Notifications & send push token to backend.
+ * Safe to call in any environment — silently skips unsupported platforms.
  */
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
   let token: string | null = null;
 
   if (Platform.OS === 'web') {
-    console.log('ℹ️ Push notifications are disabled on web browser platform.');
     return null;
   }
 
-  // SDK 53+: Expo Go no longer supports remote push token registration. Development build required.
+  // SDK 53+: Expo Go no longer supports remote push token registration.
   if (isExpoGo) {
-    console.log(
-      'ℹ️ Expo Go app detected (SDK 53+). Remote push notifications require a standalone or development build. Skipping token registration.'
-    );
     return null;
   }
 
@@ -63,8 +66,12 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     return null;
   }
 
+  // Configure the handler here, lazily, after we know the module loaded correctly.
+  configureNotificationHandler();
+
   if (!Device.isDevice) {
     console.log('ℹ️ Push notifications require a physical device.');
+    return null;
   }
 
   try {
@@ -77,11 +84,10 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     }
 
     if (finalStatus !== 'granted') {
-      console.warn('⚠️ Push notification permissions were not granted by the user.');
+      console.warn('⚠️ Push notification permissions were not granted.');
       return null;
     }
 
-    // Retrieve Expo Push Token with optional projectId fallback from Constants
     const projectId =
       Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
 
@@ -89,9 +95,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       projectId ? { projectId } : undefined
     );
     token = pushTokenData.data;
-    console.log('📲 [Expo Push Token Retrieved]:', token);
 
-    // Save push token to backend
     if (token) {
       await ApiClient.savePushToken(token);
     }
@@ -99,8 +103,8 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     console.warn('Notice registering for push notifications:', err?.message || err);
   }
 
-  // Android Notification Channel Setup
-  if (Platform.OS === 'android') {
+  // Android notification channel setup
+  if (Platform.OS === 'android' && NotificationsMod) {
     try {
       await NotificationsMod.setNotificationChannelAsync('default', {
         name: 'default',
@@ -109,7 +113,7 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
         lightColor: '#0066FF',
       });
     } catch {
-      // Ignore channel setup error
+      // Non-fatal — channel setup failure does not affect core functionality
     }
   }
 

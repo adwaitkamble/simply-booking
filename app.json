@@ -5,6 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "cover",
@@ -14,8 +15,15 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#FAF7F3"
-      }
+      },
+      "package": "com.adwaitkamble007.simplybooking",
+      "edgeToEdgeEnabled": true
     },
-    "platforms": ["ios", "android", "web"]
+    "platforms": ["ios", "android", "web"],
+    "extra": {
+      "eas": {
+        "projectId": "58cd8984-2f37-4252-a3c8-23bd99bbe4ad"
+      }
+    }
   }
 }

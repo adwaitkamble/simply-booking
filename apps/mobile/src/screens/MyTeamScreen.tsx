@@ -48,8 +48,8 @@ export const MyTeamScreen: React.FC<MyTeamScreenProps> = ({ onBack, onOpenEditUs
     try {
       setError(null);
       const data = await ApiClient.fetchTeamData();
-      setStats(data.stats);
-      setMembers(data.members);
+      setStats(data?.stats || { used: 0, limit: 50, isLimitReached: false });
+      setMembers(Array.isArray(data?.members) ? data.members : []);
     } catch (err: any) {
       console.warn('Failed to load team data:', err);
       setError(err?.message || 'Failed to fetch team data from PostgreSQL backend');
@@ -61,11 +61,11 @@ export const MyTeamScreen: React.FC<MyTeamScreenProps> = ({ onBack, onOpenEditUs
 
   const sortedMembers = useMemo(() => {
     return [...members].sort((a, b) => {
-      const aIsAdmin = a.role === 'Admin' || a.isPrimaryOwner || a.email.toLowerCase() === 'adwaitakamble007@gmail.com';
-      const bIsAdmin = b.role === 'Admin' || b.isPrimaryOwner || b.email.toLowerCase() === 'adwaitakamble007@gmail.com';
+      const aIsAdmin = a.role === 'Admin' || a.isPrimaryOwner || (a.email || '').toLowerCase() === 'adwaitakamble007@gmail.com';
+      const bIsAdmin = b.role === 'Admin' || b.isPrimaryOwner || (b.email || '').toLowerCase() === 'adwaitakamble007@gmail.com';
       if (aIsAdmin && !bIsAdmin) return -1;
       if (!aIsAdmin && bIsAdmin) return 1;
-      return a.name.localeCompare(b.name);
+      return (a.name || '').localeCompare(b.name || '');
     });
   }, [members]);
 

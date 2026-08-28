@@ -187,12 +187,16 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       }
 
       // 2. Fetch all rooms for this property
-      const propertyRooms = await ApiClient.fetchPropertyRooms(defaultProp.id);
-      setRooms(propertyRooms);
+      if (defaultProp?.id) {
+        const propertyRooms = await ApiClient.fetchPropertyRooms(defaultProp.id);
+        setRooms(Array.isArray(propertyRooms) ? propertyRooms : []);
+      } else {
+        setRooms([]);
+      }
 
       // 3. Fetch all active reservations
       const allReservations = await ApiClient.fetchReservations();
-      setReservations(allReservations);
+      setReservations(Array.isArray(allReservations) ? allReservations : []);
     } catch (err: any) {
       console.warn('PMS Data Fetch:', err);
       setError(err.message || 'Connecting to server...');
@@ -475,8 +479,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
         if (!rawIn || !rawOut) return null;
 
-        const resCheckInIso = typeof rawIn === 'string' ? rawIn.slice(0, 10) : new Date(rawIn).toISOString().slice(0, 10);
-        const resCheckOutIso = typeof rawOut === 'string' ? rawOut.slice(0, 10) : new Date(rawOut).toISOString().slice(0, 10);
+        const toIsoDay = (v: any): string => {
+          if (typeof v === 'string') return v.slice(0, 10);
+          const d = new Date(v);
+          return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+        };
+        const resCheckInIso = toIsoDay(rawIn);
+        const resCheckOutIso = toIsoDay(rawOut);
+
+        if (!resCheckInIso || !resCheckOutIso) return null;
 
         if (resCheckInIso <= lastColIso && resCheckOutIso >= firstColIso) {
           let startIndex = dateColumns.findIndex((col) => col.isoDate === resCheckInIso);

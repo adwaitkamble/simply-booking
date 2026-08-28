@@ -8,5 +8,7 @@ build/
 Thumbs.db
 .expo/
 .turbo/
+android/
+ios/
 
 pms-key.pem

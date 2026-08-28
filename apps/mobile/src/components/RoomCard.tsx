@@ -18,10 +18,18 @@ interface RoomCardProps {
 }
 
 export const RoomCard: React.FC<RoomCardProps> = ({ room, onPress }) => {
-  const { imageUrl, categoryName, roomName, status, childCount, adultCount } = room;
+  const safeRoom = room || ({} as RoomItemData);
+  const {
+    imageUrl = '',
+    categoryName = 'Standard',
+    roomName = 'Unnamed room',
+    status = 'Unknown',
+    childCount = 0,
+    adultCount = 0,
+  } = safeRoom;
 
   const getStatusStyle = () => {
-    switch (status.toLowerCase()) {
+    switch (String(status).toLowerCase()) {
       case 'active':
       case 'clean':
         return {
@@ -52,7 +60,7 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, onPress }) => {
   return (
     <TouchableOpacity
       style={styles.cardContainer}
-      onPress={() => onPress?.(room)}
+      onPress={() => onPress?.(safeRoom)}
       activeOpacity={0.8}
     >
       {/* Left: Square Image Thumbnail */}

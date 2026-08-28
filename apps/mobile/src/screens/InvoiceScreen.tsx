@@ -278,7 +278,7 @@ export const InvoiceScreen: React.FC<InvoiceScreenProps> = ({
               <View>
                 <Text style={styles.receiptBrand}>THE ROYAL MARATHA RESORT • PUNE</Text>
                 <Text style={styles.receiptHeading}>Tax Invoice & Folio Receipt</Text>
-                <Text style={styles.receiptId}>GSTIN: 27AAACH1234F1Z5 • Inv #{invoice.id.slice(0, 8)}</Text>
+                <Text style={styles.receiptId}>GSTIN: 27AAACH1234F1Z5 • Inv #{invoice.id?.slice(0, 8) ?? '—'}</Text>
               </View>
               <Badge status={invoice.status} dot size="md" />
             </View>
@@ -293,14 +293,14 @@ export const InvoiceScreen: React.FC<InvoiceScreenProps> = ({
             </View>
 
             {/* Charges Rows */}
-            {invoice.items?.map((item) => (
-              <View key={item.id} style={styles.tableRow}>
-                <Text style={[styles.tdDesc, styles.flex3]}>{item.description}</Text>
+            {(invoice.items || []).map((item, idx) => (
+              <View key={item?.id || idx} style={styles.tableRow}>
+                <Text style={[styles.tdDesc, styles.flex3]}>{item?.description || '—'}</Text>
                 <Text style={[styles.tdCategory, styles.flex1, styles.textCenter]}>
-                  {item.category === 'FoodAndBeverage' ? 'Dining' : item.category}
+                  {item?.category === 'FoodAndBeverage' ? 'Dining' : (item?.category || '—')}
                 </Text>
                 <Text style={[styles.tdAmount, styles.flex1, styles.textRight]}>
-                  ₹{item.amount.toLocaleString('en-IN')}
+                  ₹{Number(item?.amount || 0).toLocaleString('en-IN')}
                 </Text>
               </View>
             ))}
@@ -310,17 +310,17 @@ export const InvoiceScreen: React.FC<InvoiceScreenProps> = ({
             {/* Financial Calculations */}
             <View style={styles.calcRow}>
               <Text style={styles.calcLabel}>Subtotal Charges</Text>
-              <Text style={styles.calcValue}>₹{invoice.subtotal.toLocaleString('en-IN')}</Text>
+              <Text style={styles.calcValue}>₹{Number(invoice.subtotal || 0).toLocaleString('en-IN')}</Text>
             </View>
 
             <View style={styles.calcRow}>
               <Text style={styles.calcLabel}>GST (18%: 9% CGST + 9% SGST)</Text>
-              <Text style={styles.calcValue}>₹{invoice.taxAmount.toLocaleString('en-IN')}</Text>
+              <Text style={styles.calcValue}>₹{Number(invoice.taxAmount || 0).toLocaleString('en-IN')}</Text>
             </View>
 
             <View style={styles.grandTotalRow}>
               <Text style={styles.grandTotalLabel}>Grand Total (Due)</Text>
-              <Text style={styles.grandTotalValue}>₹{invoice.grandTotal.toLocaleString('en-IN')}</Text>
+              <Text style={styles.grandTotalValue}>₹{Number(invoice.grandTotal || 0).toLocaleString('en-IN')}</Text>
             </View>
 
             {/* Payment Settlement Action */}
