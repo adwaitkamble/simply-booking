@@ -140,22 +140,53 @@ export const AddReservationScreen: React.FC<AddReservationScreenProps> = ({
     const fetchRooms = async () => {
       try {
         setLoadingRooms(true);
-        const res = await ApiClient.fetchRoomsData();
-        const rawRooms = res.rooms || [];
+        let formattedRooms: any[] = [];
 
-        const formattedRooms = rawRooms.map((rm: any) => {
-          const category = rm.categoryName || 'Standard';
-          const roomNum = rm.roomName ? rm.roomName.replace('Room ', '') : rm.roomNumber || rm.roomId;
-          return {
-            id: rm.roomId || rm.id,
-            roomId: rm.roomId || rm.id,
-            roomNumber: roomNum,
-            categoryName: category,
-            displayName: `${category}-${roomNum} - ${category} ${roomNum}`,
-            pricePerNight: rm.pricePerNight || 2500,
-            status: rm.status,
-          };
-        });
+        // 1. Try fetching property rooms directly for the default property
+        try {
+          const defaultProp = await ApiClient.fetchDefaultProperty();
+          if (defaultProp?.id) {
+            const propRooms = await ApiClient.fetchPropertyRooms(defaultProp.id);
+            if (Array.isArray(propRooms) && propRooms.length > 0) {
+              formattedRooms = propRooms.map((rm: any) => {
+                const category = rm.roomCategory?.name || rm.categoryName || 'Standard';
+                const roomNum = String(rm.roomNumber || rm.roomName || '').replace('Room ', '').trim();
+                const price = rm.pricePerNight ?? rm.roomCategory?.basePrice ?? 2500;
+                return {
+                  id: rm.id,
+                  roomId: rm.id,
+                  roomNumber: roomNum,
+                  categoryName: category,
+                  displayName: `${category}-${roomNum} - ${category} ${roomNum}`,
+                  pricePerNight: Number(price) || 2500,
+                  status: rm.status || 'Clean',
+                };
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('fetchPropertyRooms notice:', e);
+        }
+
+        // 2. Fallback to fetchRoomsData if needed
+        if (formattedRooms.length === 0) {
+          const res = await ApiClient.fetchRoomsData();
+          const rawRooms = res.rooms || [];
+          formattedRooms = rawRooms.map((rm: any) => {
+            const category = rm.categoryName || 'Standard';
+            const roomNum = rm.roomName ? rm.roomName.replace('Room ', '') : rm.roomNumber || rm.roomId;
+            const price = rm.pricePerNight || 2500;
+            return {
+              id: rm.roomId || rm.id,
+              roomId: rm.roomId || rm.id,
+              roomNumber: roomNum,
+              categoryName: category,
+              displayName: `${category}-${roomNum} - ${category} ${roomNum}`,
+              pricePerNight: Number(price) || 2500,
+              status: rm.status,
+            };
+          });
+        }
 
         setAllRooms(formattedRooms);
 

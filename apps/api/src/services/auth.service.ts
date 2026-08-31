@@ -95,8 +95,9 @@ export class AuthService {
         },
       ];
 
-      for (const cat of starterCategories) {
-        await tx.roomCategories.create({
+      for (let i = 0; i < starterCategories.length; i++) {
+        const cat = starterCategories[i];
+        const createdCat = await tx.roomCategories.create({
           data: {
             name: cat.name,
             description: cat.description,
@@ -104,6 +105,19 @@ export class AuthService {
             propertyId: property.id,
           },
         });
+
+        // Create 2 starter rooms per category (e.g., 101, 102, 201, 202, etc.)
+        const floor = i + 1;
+        for (const roomNum of [`${floor}01`, `${floor}02`]) {
+          await tx.rooms.create({
+            data: {
+              roomNumber: roomNum,
+              pricePerNight: cat.basePrice,
+              status: 'Clean',
+              roomCategoryId: createdCat.id,
+            },
+          });
+        }
       }
 
       const user = await tx.users.create({

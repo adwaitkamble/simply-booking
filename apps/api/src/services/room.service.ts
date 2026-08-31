@@ -10,12 +10,66 @@ export class RoomService {
   static async getRoomsByProperty(propertyId: string) {
     const property = await prisma.properties.findUnique({
       where: { id: propertyId },
+      include: {
+        roomCategories: {
+          include: {
+            rooms: true,
+          },
+        },
+      },
     });
 
     if (!property) {
       const error: any = new Error(`Property with ID ${propertyId} not found`);
       error.statusCode = 404;
       throw error;
+    }
+
+    // Auto-seed rooms if property has 0 rooms
+    const totalRooms = property.roomCategories.reduce((acc, cat) => acc + (cat.rooms?.length || 0), 0);
+    if (totalRooms === 0) {
+      if (property.roomCategories.length === 0) {
+        const categoriesData = [
+          { name: 'Deluxe Heritage Room', description: 'Spacious king bedroom with garden view', basePrice: 2800.0, rooms: ['101', '102', '103'] },
+          { name: 'Executive Garden Suite', description: 'Luxury suite with balcony overlooking pool', basePrice: 4500.0, rooms: ['201', '202', '203'] },
+          { name: 'Royal Penthouse', description: 'Top-tier luxury penthouse with scenic views', basePrice: 8500.0, rooms: ['301', '302', '303'] },
+        ];
+        for (const cat of categoriesData) {
+          const createdCat = await prisma.roomCategories.create({
+            data: {
+              name: cat.name,
+              description: cat.description,
+              basePrice: cat.basePrice,
+              propertyId: property.id,
+            },
+          });
+          for (const rNum of cat.rooms) {
+            await prisma.rooms.create({
+              data: {
+                roomNumber: rNum,
+                pricePerNight: cat.basePrice,
+                status: 'Clean',
+                roomCategoryId: createdCat.id,
+              },
+            });
+          }
+        }
+      } else {
+        for (let i = 0; i < property.roomCategories.length; i++) {
+          const cat = property.roomCategories[i];
+          const floor = i + 1;
+          for (const rNum of [`${floor}01`, `${floor}02`, `${floor}03`]) {
+            await prisma.rooms.create({
+              data: {
+                roomNumber: rNum,
+                pricePerNight: cat.basePrice,
+                status: 'Clean',
+                roomCategoryId: cat.id,
+              },
+            });
+          }
+        }
+      }
     }
 
     const rooms = await prisma.rooms.findMany({
@@ -546,6 +600,11 @@ export class RoomService {
   static async getRoomsInventory(propertyId?: string) {
     const now = new Date();
 
+    // Auto-ensure rooms exist if propertyId given
+    if (propertyId) {
+      await RoomService.getRoomsByProperty(propertyId);
+    }
+
     const rooms = await prisma.rooms.findMany({
       where: propertyId
         ? {
@@ -591,9 +650,13 @@ export class RoomService {
         : rm.status;
 
       return {
+        id: rm.id,
         roomId: rm.id,
+        roomNumber: rm.roomNumber,
+        roomCategoryId: rm.roomCategoryId,
+        pricePerNight: rm.pricePerNight ?? rm.roomCategory?.basePrice ?? 2500,
         imageUrl: roomImages[idx % roomImages.length],
-        categoryName: rm.roomCategory.name,
+        categoryName: rm.roomCategory?.name || 'Standard',
         roomName: `Room ${rm.roomNumber}`,
         status: statusStr,
         childCount: activeRes?.children ?? 0,

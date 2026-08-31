@@ -190,7 +190,7 @@ export class RoomController {
         name,
         description,
         basePrice,
-        propertyId,
+        propertyId: propertyId!,
       });
 
       res.status(201).json({
@@ -216,7 +216,7 @@ export class RoomController {
         propertyId = defaultProp.id;
       }
 
-      const categories = await RoomService.getRoomCategories(propertyId);
+      const categories = await RoomService.getRoomCategories(propertyId!);
 
       res.json({
         success: true,

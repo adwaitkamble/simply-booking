@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npx expo *)",
+      "Bash(git status)",
+      "Read(frontend/src/**)",
+      "Read(backend/src/**)",
+      "Edit(frontend/src/**)",
+      "Edit(backend/src/**)",
+      "Bash(npm test *)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "WebFetch"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(backend/.env)",
+      "Read(secrets/**)",
+      "Bash(rm -rf *)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "npm run lint && npm test"
+      }
+    ]
+  }
+}

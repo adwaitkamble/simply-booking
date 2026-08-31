@@ -70,7 +70,7 @@ model Users {
   mobileNumber  String?
   role          UserRole        @default(Admin)
   isActive      Boolean         @default(true)
-  permissions   Json?
+  permissions   Json            @default("{}")
   pushToken     String?
   propertyId    String
   property      Properties      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
