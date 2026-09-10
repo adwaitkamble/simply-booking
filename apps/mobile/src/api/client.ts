@@ -143,7 +143,7 @@ function getRequestHeaders(customHeaders: Record<string, string> = {}): Record<s
   return headers;
 }
 
-async function safeParseJsonResponse(res: Response): Promise<any> {
+async function safeParseJsonResponse(res: Response, fallbackErrorMessage?: string): Promise<any> {
   const contentType = res.headers.get('content-type') || '';
   const text = await res.text();
 
@@ -157,7 +157,11 @@ async function safeParseJsonResponse(res: Response): Promise<any> {
   }
 
   if (!res.ok) {
-    const errorMsg = json?.error || (text ? text.replace(/<[^>]*>/g, '').trim().slice(0, 150) : `HTTP Error ${res.status}`);
+    const errorMsg =
+      json?.error ||
+      (text ? text.replace(/<[^>]*>/g, '').trim().slice(0, 150) : '') ||
+      fallbackErrorMessage ||
+      `HTTP Error ${res.status}`;
     throw new ApiError(errorMsg || `Server error (${res.status})`, res.status);
   }
 
@@ -495,11 +499,7 @@ export const ApiClient = {
     const res = await fetch(`${resolveApiBaseUrl()}/properties/default`, {
       headers: getRequestHeaders(),
     });
-    const json = await res.json();
-
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Failed to fetch default property', res.status);
-    }
+    const json = await safeParseJsonResponse(res, 'Failed to fetch default property');
 
     return json.data;
   },
@@ -511,11 +511,7 @@ export const ApiClient = {
     const res = await fetch(`${resolveApiBaseUrl()}/properties/${propertyId}/rooms`, {
       headers: getRequestHeaders(),
     });
-    const json = await res.json();
-
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Failed to fetch property rooms', res.status);
-    }
+    const json = await safeParseJsonResponse(res, 'Failed to fetch property rooms');
 
     return json.data || [];
   },
@@ -530,11 +526,7 @@ export const ApiClient = {
       body: JSON.stringify(data),
     });
 
-    const json = await res.json();
-
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Failed to create room', res.status);
-    }
+    const json = await safeParseJsonResponse(res, 'Failed to create room');
 
     return json.data;
   },
@@ -772,11 +764,7 @@ export const ApiClient = {
     const res = await fetch(`${resolveApiBaseUrl()}/rooms/available?${params.toString()}`, {
       headers: getRequestHeaders(),
     });
-    const json = await res.json();
-
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Failed to fetch available rooms', res.status);
-    }
+    const json = await safeParseJsonResponse(res, 'Failed to fetch available rooms');
 
     return json.data || [];
   },
@@ -793,11 +781,7 @@ export const ApiClient = {
     const res = await fetch(`${resolveApiBaseUrl()}/rooms/housekeeping?${params.toString()}`, {
       headers: getRequestHeaders(),
     });
-    const json = await res.json();
-
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Failed to fetch housekeeping rooms', res.status);
-    }
+    const json = await safeParseJsonResponse(res, 'Failed to fetch housekeeping rooms');
 
     return json.data || [];
   },
@@ -816,11 +800,7 @@ export const ApiClient = {
       body: JSON.stringify({ status, staffId }),
     });
 
-    const json = await res.json();
-
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Failed to update room status', res.status);
-    }
+    const json = await safeParseJsonResponse(res, 'Failed to update room status');
 
     return json.data;
   },
@@ -835,11 +815,7 @@ export const ApiClient = {
       body: JSON.stringify(input),
     });
 
-    const json = await res.json();
-
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Reservation request failed', res.status);
-    }
+    const json = await safeParseJsonResponse(res, 'Reservation request failed');
 
     return json.data;
   },
@@ -851,11 +827,7 @@ export const ApiClient = {
     const res = await fetch(`${resolveApiBaseUrl()}/reservations`, {
       headers: getRequestHeaders(),
     });
-    const json = await res.json();
-
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Failed to fetch reservations', res.status);
-    }
+    const json = await safeParseJsonResponse(res, 'Failed to fetch reservations');
 
     return json.data || [];
   },
@@ -870,11 +842,7 @@ export const ApiClient = {
       body: JSON.stringify(input),
     });
 
-    const json = await res.json();
-
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Failed to generate invoice', res.status);
-    }
+    const json = await safeParseJsonResponse(res, 'Failed to generate invoice');
 
     return json.data;
   },
@@ -886,11 +854,7 @@ export const ApiClient = {
     const res = await fetch(`${resolveApiBaseUrl()}/invoices/${invoiceId}`, {
       headers: getRequestHeaders(),
     });
-    const json = await res.json();
-
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Failed to fetch invoice', res.status);
-    }
+    const json = await safeParseJsonResponse(res, 'Failed to fetch invoice');
 
     return json.data;
   },
@@ -902,11 +866,7 @@ export const ApiClient = {
     const res = await fetch(`${resolveApiBaseUrl()}/invoices/reservation/${reservationId}`, {
       headers: getRequestHeaders(),
     });
-    const json = await res.json();
-
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Failed to fetch invoice for reservation', res.status);
-    }
+    const json = await safeParseJsonResponse(res, 'Failed to fetch invoice for reservation');
 
     return json.data;
   },
@@ -920,11 +880,7 @@ export const ApiClient = {
       headers: getRequestHeaders(),
     });
 
-    const json = await res.json();
-
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Failed to process payment', res.status);
-    }
+    const json = await safeParseJsonResponse(res, 'Failed to process payment');
 
     return json.data;
   },
@@ -939,11 +895,7 @@ export const ApiClient = {
       body: JSON.stringify(payload),
     });
 
-    const json = await res.json();
-
-    if (!res.ok) {
-      throw new ApiError(json.error || 'OTA Webhook processing failed', res.status);
-    }
+    const json = await safeParseJsonResponse(res, 'OTA Webhook processing failed');
 
     return json.data;
   },
@@ -955,11 +907,7 @@ export const ApiClient = {
     const res = await fetch(`${resolveApiBaseUrl()}/webhooks/logs?limit=${limit}`, {
       headers: getRequestHeaders(),
     });
-    const json = await res.json();
-
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Failed to fetch channel logs', res.status);
-    }
+    const json = await safeParseJsonResponse(res, 'Failed to fetch channel logs');
 
     return json.data || [];
   },
@@ -971,11 +919,7 @@ export const ApiClient = {
     const res = await fetch(`${resolveApiBaseUrl()}/webhooks/metrics`, {
       headers: getRequestHeaders(),
     });
-    const json = await res.json();
-
-    if (!res.ok) {
-      throw new ApiError(json.error || 'Failed to fetch channel metrics', res.status);
-    }
+    const json = await safeParseJsonResponse(res, 'Failed to fetch channel metrics');
 
     return json.data;
   },

@@ -1,17 +1,17 @@
 /**
- * Expo config plugin: allow cleartext (HTTP) traffic to the API server IP.
+ * Expo config plugin: allow cleartext (HTTP) traffic in release builds.
  *
- * Android blocks plain HTTP in release builds by default. Since the API
- * runs on a bare IP without TLS, we inject a network_security_config.xml
- * that explicitly permits cleartext traffic to that host only.
+ * Android blocks plain HTTP in release builds by default. Since the API runs on
+ * a bare IP without TLS, we inject a network_security_config.xml that permits
+ * cleartext traffic globally via base-config.
  *
- * This is scoped to the single server IP — all other traffic still requires HTTPS.
+ * A <domain> tag cannot hold a raw IP address — Android rejects such a config at
+ * runtime and falls back to blocking all cleartext, which kills API traffic on
+ * launch. So the permission has to be granted through base-config instead.
  */
 const { withAndroidManifest, withDangerousMod } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
-
-const API_HOST = '15.252.181.3';
 
 // Step 1: Write the network_security_config.xml file into the Android res/xml directory
 function withNetworkSecurityConfig(config) {
@@ -32,12 +32,8 @@ function withNetworkSecurityConfig(config) {
 
       const xmlContent = `<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-  <!-- Allow cleartext HTTP to the PMS API server only -->
-  <domain-config cleartextTrafficPermitted="true">
-    <domain includeSubdomains="false">${API_HOST}</domain>
-  </domain-config>
-  <!-- All other traffic must use HTTPS -->
-  <base-config cleartextTrafficPermitted="false">
+  <!-- Allow cleartext HTTP traffic to backend IP and all endpoints -->
+  <base-config cleartextTrafficPermitted="true">
     <trust-anchors>
       <certificates src="system" />
     </trust-anchors>

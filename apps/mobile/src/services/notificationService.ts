@@ -9,6 +9,19 @@ const isExpoGo =
   (Constants as any)?.executionEnvironment === 'storeClient' ||
   (Constants as any)?.appOwnership === 'expo';
 
+// Remote push tokens on Android are issued by Firebase Cloud Messaging. In a standalone
+// APK without a google-services.json baked in, `getExpoPushTokenAsync()` throws a native
+// Java `IllegalStateException: Default FirebaseApp is not initialized` that unwinds past
+// the JS try/catch and terminates the process. Detect that case up front and skip the
+// remote token entirely — local notifications and channels still work.
+const androidHasFirebaseConfig = Boolean(
+  (Constants as any)?.expoConfig?.android?.googleServicesFile ??
+    (Constants as any)?.manifest?.android?.googleServicesFile
+);
+
+const canRequestRemotePushToken =
+  Platform.OS !== 'android' || isExpoGo || androidHasFirebaseConfig;
+
 // Dynamic lazy module loader — avoids top-level side-effects that crash production builds.
 // expo-notifications must never be imported at module scope in a standalone APK
 // because its native module initializes notification channels on load.
@@ -88,16 +101,22 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       return null;
     }
 
-    const projectId =
-      Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+    if (!canRequestRemotePushToken) {
+      console.warn(
+        '⚠️ Skipping Expo push token: no google-services.json configured for this Android build.'
+      );
+    } else {
+      const projectId =
+        Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
 
-    const pushTokenData = await NotificationsMod.getExpoPushTokenAsync(
-      projectId ? { projectId } : undefined
-    );
-    token = pushTokenData.data;
+      const pushTokenData = await NotificationsMod.getExpoPushTokenAsync(
+        projectId ? { projectId } : undefined
+      );
+      token = pushTokenData.data;
 
-    if (token) {
-      await ApiClient.savePushToken(token);
+      if (token) {
+        await ApiClient.savePushToken(token);
+      }
     }
   } catch (err: any) {
     console.warn('Notice registering for push notifications:', err?.message || err);
