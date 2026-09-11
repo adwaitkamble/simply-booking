@@ -18,6 +18,7 @@
       }
     },
     "production": {
+      "distribution": "internal",
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://simply-booking.onrender.com/api"
