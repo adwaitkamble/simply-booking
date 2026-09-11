@@ -212,7 +212,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     // Connect to real-time server for live updates
     const socketUrl = ApiClient.getSocketUrl();
     const socket: Socket = io(socketUrl, {
-      transports: ['websocket', 'polling'],
+      // websocket only: Hermes has no browser cookie jar, so socket.io's XHR
+      // long-polling fallback fails and can take the app down on connect.
+      transports: ['websocket'],
     });
 
     socket.on('connect', () => {

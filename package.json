@@ -10,7 +10,7 @@
   ],
   "main": "apps/mobile/index.js",
   "scripts": {
-    "build": "npm run generate --workspace=@hotel-pms/database && npm run --workspaces --if-present build",
+    "build": "npm run generate --workspace=@hotel-pms/database && npm run build --workspace=@hotel-pms/types && npm run build --workspace=@hotel-pms/database && npm run build --workspace=@hotel-pms/api",
     "dev:api": "npm run dev --workspace=@hotel-pms/api",
     "dev:mobile": "npm run start --workspace=@hotel-pms/mobile",
     "start": "expo start apps/mobile",
