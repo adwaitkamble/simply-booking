@@ -36,8 +36,4 @@ module.exports = {
     },
   },
 
-  // Allow HTTP traffic to the API server IP (Android blocks cleartext by default).
-  plugins: [
-    './plugins/withCleartextTraffic',
-  ],
 };

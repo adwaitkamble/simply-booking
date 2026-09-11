@@ -11,13 +11,19 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://15.252.181.3:4000/api"
+        "EXPO_PUBLIC_API_URL": "https://simply-booking.onrender.com/api"
+      },
+      "android": {
+        "buildType": "apk"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://15.252.181.3:4000/api"
+        "EXPO_PUBLIC_API_URL": "https://simply-booking.onrender.com/api"
+      },
+      "android": {
+        "buildType": "apk"
       }
     }
   },
