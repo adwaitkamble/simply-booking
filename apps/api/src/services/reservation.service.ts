@@ -264,13 +264,13 @@ export class ReservationService {
         guestPhone: createdReservation.guest.phone,
         propertyName: createdReservation.room.roomCategory?.property?.name || 'Hotel Property',
         roomNumber: createdReservation.room.roomNumber,
+        roomType: createdReservation.room.roomCategory?.name,
         checkIn: createdReservation.checkIn.toISOString().slice(0, 10),
         checkOut: createdReservation.checkOut.toISOString().slice(0, 10),
         totalAmount: total,
         advancePaid: advance,
         pendingAmount: pending,
         currency,
-        bookingRef: createdReservation.id,
         calendarLink: calendarLink || undefined,
       }).catch((waErr: any) => {
         console.warn(`⚠️ [WhatsApp Confirmation Error] Failed to send message: ${waErr.message}`);
