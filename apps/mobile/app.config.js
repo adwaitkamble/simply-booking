@@ -30,6 +30,9 @@ module.exports = {
 
   platforms: ['ios', 'android', 'web'],
 
+  // expo-sharing ships a native module; it must be registered for prebuild.
+  plugins: ['expo-sharing'],
+
   extra: {
     eas: {
       projectId: '58cd8984-2f37-4252-a3c8-23bd99bbe4ad',

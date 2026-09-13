@@ -284,14 +284,21 @@ export class ReservationService {
    * Fetch all reservations with full relation graphs, filtered by property
    */
   static async getAllReservations(propertyId?: string) {
+    // Never run unscoped: that returned every tenant's reservations.
+    if (!propertyId) {
+      const error: any = new Error('No property is associated with this account.');
+      error.statusCode = 400;
+      throw error;
+    }
+
     return await prisma.reservations.findMany({
-      where: propertyId ? {
+      where: {
         room: {
           roomCategory: {
             propertyId,
           },
         },
-      } : undefined,
+      },
       include: {
         guest: true,
         room: {

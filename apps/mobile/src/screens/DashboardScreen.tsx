@@ -40,6 +40,7 @@ interface DashboardScreenProps {
   }) => void;
   onOpenInvoice?: (reservationId: string) => void;
   onOpenBookings?: () => void;
+  onOpenBookingReport?: () => void;
   onOpenRooms?: () => void;
   onOpenMyTeam?: () => void;
   onOpenChangePassword?: () => void;
@@ -55,6 +56,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onOpenBookingForm,
   onOpenInvoice,
   onOpenBookings,
+  onOpenBookingReport,
   onOpenRooms,
   onOpenMyTeam,
   onOpenChangePassword,
@@ -1271,8 +1273,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         ownerName={property?.user?.name || 'Hotel Owner'}
         onSelectMenuItem={(id: DrawerMenuItemId) => {
           switch (id) {
-            case 'bookings':
             case 'booking_report':
+              if (onOpenBookingReport) {
+                onOpenBookingReport();
+              }
+              break;
+            case 'bookings':
               if (onOpenBookings) {
                 onOpenBookings();
               } else {

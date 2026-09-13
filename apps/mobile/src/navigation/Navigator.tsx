@@ -15,6 +15,7 @@ import { RegisterScreen } from '../screens/RegisterScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { AddReservationScreen } from '../screens/AddReservationScreen';
 import { BookingsScreen } from '../screens/BookingsScreen';
+import { BookingReportScreen } from '../screens/BookingReportScreen';
 import { RoomsScreen } from '../screens/RoomsScreen';
 import { MyTeamScreen } from '../screens/MyTeamScreen';
 import { EditUserScreen } from '../screens/EditUserScreen';
@@ -29,7 +30,7 @@ import { AvailableRoomItem } from '../api/client';
 import { shadows } from '../theme';
 
 type TabName = 'booking' | 'housekeeping' | 'invoicing' | 'channel';
-type ScreenName = 'dashboard' | 'addReservation' | 'bookings' | 'rooms' | 'myTeam' | 'editUser' | 'changePassword' | 'support' | 'notifications' | 'housekeeping' | 'invoicing' | 'channel';
+type ScreenName = 'dashboard' | 'addReservation' | 'bookings' | 'bookingReport' | 'rooms' | 'myTeam' | 'editUser' | 'changePassword' | 'support' | 'notifications' | 'housekeeping' | 'invoicing' | 'channel';
 
 interface NavigationState {
   currentTab: TabName;
@@ -134,6 +135,14 @@ export const Navigator: React.FC = () => {
       prefilledRoomId: undefined,
       prefilledRoomNumber: undefined,
       focusedCalendarDate: focusedDate || prev.focusedCalendarDate,
+    }));
+  };
+
+  const navigateToBookingReport = () => {
+    setNavState((prev) => ({
+      ...prev,
+      currentTab: 'booking',
+      currentScreen: 'bookingReport',
     }));
   };
 
@@ -264,6 +273,7 @@ export const Navigator: React.FC = () => {
                 onOpenBookingForm={navigateToAddReservation}
                 onOpenInvoice={navigateToInvoice}
                 onOpenBookings={navigateToBookings}
+                onOpenBookingReport={navigateToBookingReport}
                 onOpenRooms={navigateToRooms}
                 onOpenMyTeam={navigateToMyTeam}
                 onOpenChangePassword={navigateToChangePassword}
@@ -280,6 +290,9 @@ export const Navigator: React.FC = () => {
                   if (b.id) navigateToInvoice(b.id);
                 }}
               />
+            )}
+            {navState.currentScreen === 'bookingReport' && (
+              <BookingReportScreen onBack={() => navigateToDashboard()} />
             )}
             {navState.currentScreen === 'rooms' && (
               <RoomsScreen
