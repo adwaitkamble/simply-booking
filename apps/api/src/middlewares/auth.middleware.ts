@@ -1,7 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@hotel-pms/database';
-import { PropertyService } from '../services/property.service.js';
 import type { AuthUserPayload } from '@hotel-pms/types';
 
 export const JWT_SECRET = process.env.JWT_SECRET || 'simply-booking-super-secret-jwt-key-2026';
@@ -46,45 +45,31 @@ export const authenticateUser = async (
             propertyId: dbUser.propertyId,
             propertyName: decoded.propertyName || 'Hotel Property',
           };
-        } else {
-          req.user = {
-            ...decoded,
-            role: decoded.role || 'Admin',
-            isActive: decoded.isActive ?? true,
-          };
+          next();
+          return;
         }
 
-        next();
+        // Token is valid but the account no longer exists — do not fall back to
+        // the stale claims embedded in the token.
+        res.status(401).json({
+          success: false,
+          error: 'Your account is no longer available. Please sign in again.',
+          statusCode: 401,
+        });
         return;
       }
     } catch {
-      // Invalid or expired token - fallback to default property owner context below
+      // Invalid or expired token — fall through to the 401 below.
     }
   }
 
-  // Fallback to primary owner user if no token provided
-  try {
-    const defaultProp = await PropertyService.getDefaultProperty();
-    const ownerUser = await prisma.users.findFirst({
-      where: { propertyId: defaultProp.id },
-    });
-
-    req.user = {
-      userId: ownerUser?.id || 'default-user-id',
-      email: ownerUser?.email || 'owner@simplybooking.com',
-      name: ownerUser?.name || 'Hotel Owner',
-      role: (ownerUser?.role as any) || 'Admin',
-      isActive: ownerUser?.isActive ?? true,
-      permissions: (ownerUser?.permissions as any) || null,
-      propertyId: defaultProp.id,
-      propertyName: defaultProp.name,
-    };
-    next();
-  } catch (err: any) {
-    res.status(401).json({
-      success: false,
-      error: 'Authentication required. No Bearer token provided.',
-      statusCode: 401,
-    });
-  }
+  // No valid token: reject. There is deliberately no fallback identity here —
+  // one used to resolve unauthenticated requests to the owner of a "default"
+  // property, which handed every anonymous caller full Admin access to that
+  // tenant's data and made new accounts see another hotel's rooms.
+  res.status(401).json({
+    success: false,
+    error: 'Authentication required. Please sign in again.',
+    statusCode: 401,
+  });
 };

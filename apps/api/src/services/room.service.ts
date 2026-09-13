@@ -25,52 +25,8 @@ export class RoomService {
       throw error;
     }
 
-    // Auto-seed rooms if property has 0 rooms
-    const totalRooms = property.roomCategories.reduce((acc, cat) => acc + (cat.rooms?.length || 0), 0);
-    if (totalRooms === 0) {
-      if (property.roomCategories.length === 0) {
-        const categoriesData = [
-          { name: 'Deluxe Heritage Room', description: 'Spacious king bedroom with garden view', basePrice: 2800.0, rooms: ['101', '102', '103'] },
-          { name: 'Executive Garden Suite', description: 'Luxury suite with balcony overlooking pool', basePrice: 4500.0, rooms: ['201', '202', '203'] },
-          { name: 'Royal Penthouse', description: 'Top-tier luxury penthouse with scenic views', basePrice: 8500.0, rooms: ['301', '302', '303'] },
-        ];
-        for (const cat of categoriesData) {
-          const createdCat = await prisma.roomCategories.create({
-            data: {
-              name: cat.name,
-              description: cat.description,
-              basePrice: cat.basePrice,
-              propertyId: property.id,
-            },
-          });
-          for (const rNum of cat.rooms) {
-            await prisma.rooms.create({
-              data: {
-                roomNumber: rNum,
-                pricePerNight: cat.basePrice,
-                status: 'Clean',
-                roomCategoryId: createdCat.id,
-              },
-            });
-          }
-        }
-      } else {
-        for (let i = 0; i < property.roomCategories.length; i++) {
-          const cat = property.roomCategories[i];
-          const floor = i + 1;
-          for (const rNum of [`${floor}01`, `${floor}02`, `${floor}03`]) {
-            await prisma.rooms.create({
-              data: {
-                roomNumber: rNum,
-                pricePerNight: cat.basePrice,
-                status: 'Clean',
-                roomCategoryId: cat.id,
-              },
-            });
-          }
-        }
-      }
-    }
+    // No auto-seeding here. A property with no rooms is a legitimate state —
+    // a newly registered hotel starts empty and builds its own inventory.
 
     const rooms = await prisma.rooms.findMany({
       where: {
@@ -154,6 +110,14 @@ export class RoomService {
    * Fetch rooms requiring housekeeping turnover (Dirty or Maintenance)
    */
   static async getHousekeepingRooms(propertyId?: string) {
+    // Every authenticated caller belongs to exactly one property; refusing to run
+    // unscoped keeps a missing id from silently returning other tenants' rooms.
+    if (!propertyId) {
+      const error: any = new Error('No property is associated with this account.');
+      error.statusCode = 400;
+      throw error;
+    }
+
     const rooms = await prisma.rooms.findMany({
       where: {
         status: { in: ['Dirty', 'Maintenance'] },
@@ -462,6 +426,114 @@ export class RoomService {
   }
 
   /**
+   * Update an existing room: number, nightly price, size, or category.
+   * Only the fields provided are changed.
+   */
+  static async updateRoom(
+    roomId: string,
+    data: {
+      roomNumber?: string;
+      pricePerNight?: number | null;
+      roomSize?: string | null;
+      roomCategoryId?: string;
+    },
+    propertyId?: string
+  ) {
+    const room = await prisma.rooms.findUnique({
+      where: { id: roomId },
+      include: { roomCategory: true },
+    });
+
+    if (!room) {
+      const error: any = new Error(`Room with ID ${roomId} not found`);
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (propertyId && room.roomCategory?.propertyId !== propertyId) {
+      const error: any = new Error('Access forbidden: You cannot edit rooms outside your property.');
+      error.statusCode = 403;
+      throw error;
+    }
+
+    const updates: any = {};
+
+    if (data.roomNumber !== undefined) {
+      const roomNumber = String(data.roomNumber).trim();
+      if (!roomNumber) {
+        const error: any = new Error('Room number cannot be empty.');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      // Room numbers only need to be unique within the property, not globally.
+      const clash = await prisma.rooms.findFirst({
+        where: {
+          roomNumber,
+          id: { not: roomId },
+          roomCategory: { propertyId: room.roomCategory.propertyId },
+        },
+      });
+
+      if (clash) {
+        const error: any = new Error(`Room #${roomNumber} already exists at this property.`);
+        error.statusCode = 409;
+        throw error;
+      }
+
+      updates.roomNumber = roomNumber;
+    }
+
+    if (data.roomCategoryId !== undefined) {
+      const category = await prisma.roomCategories.findUnique({
+        where: { id: data.roomCategoryId },
+      });
+
+      if (!category) {
+        const error: any = new Error('Selected room category not found.');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (category.propertyId !== room.roomCategory.propertyId) {
+        const error: any = new Error('Access forbidden: That category belongs to another property.');
+        error.statusCode = 403;
+        throw error;
+      }
+
+      updates.roomCategoryId = category.id;
+    }
+
+    if (data.pricePerNight !== undefined) {
+      updates.pricePerNight = data.pricePerNight;
+    }
+
+    if (data.roomSize !== undefined) {
+      updates.roomSize = data.roomSize?.trim() ? data.roomSize.trim() : null;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return room;
+    }
+
+    return await prisma.rooms.update({
+      where: { id: roomId },
+      data: updates,
+      include: {
+        roomCategory: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            basePrice: true,
+            propertyId: true,
+          },
+        },
+      },
+    });
+  }
+
+  /**
    * Delete a room by ID with reservation safety checks
    */
   static async deleteRoom(roomId: string, propertyId?: string) {
@@ -598,12 +670,15 @@ export class RoomService {
    * Fetch rooms inventory with stats and room cards mapping
    */
   static async getRoomsInventory(propertyId?: string) {
-    const now = new Date();
-
-    // Auto-ensure rooms exist if propertyId given
-    if (propertyId) {
-      await RoomService.getRoomsByProperty(propertyId);
+    // Every authenticated caller belongs to exactly one property; refusing to run
+    // unscoped keeps a missing id from silently returning other tenants' rooms.
+    if (!propertyId) {
+      const error: any = new Error('No property is associated with this account.');
+      error.statusCode = 400;
+      throw error;
     }
+
+    const now = new Date();
 
     const rooms = await prisma.rooms.findMany({
       where: propertyId

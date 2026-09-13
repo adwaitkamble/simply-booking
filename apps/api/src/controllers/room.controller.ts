@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import { RoomService } from '../services/room.service.js';
-import { PropertyService } from '../services/property.service.js';
 import type { RoomStatus } from '@hotel-pms/types';
 
 export class RoomController {
@@ -37,12 +36,7 @@ export class RoomController {
   static async getAvailableRooms(req: Request, res: Response, next: NextFunction) {
     try {
       const { checkIn, checkOut } = req.query;
-      let propertyId = req.user?.propertyId || (req.query.propertyId as string | undefined);
-
-      if (!propertyId) {
-        const defaultProp = await PropertyService.getDefaultProperty();
-        propertyId = defaultProp.id;
-      }
+      const propertyId = req.user?.propertyId;
 
       if (!checkIn || !checkOut) {
         return res.status(400).json({
@@ -73,12 +67,7 @@ export class RoomController {
    */
   static async getHousekeepingRooms(req: Request, res: Response, next: NextFunction) {
     try {
-      let propertyId = req.user?.propertyId || (req.query.propertyId as string | undefined);
-
-      if (!propertyId) {
-        const defaultProp = await PropertyService.getDefaultProperty();
-        propertyId = defaultProp.id;
-      }
+      const propertyId = req.user?.propertyId;
 
       const rooms = await RoomService.getHousekeepingRooms(propertyId);
       res.json({
@@ -132,12 +121,7 @@ export class RoomController {
   static async createRoom(req: Request, res: Response, next: NextFunction) {
     try {
       const { roomNumber, pricePerNight, roomSize, roomCategoryId, status } = req.body;
-      let propertyId = req.user?.propertyId;
-
-      if (!propertyId) {
-        const defaultProp = await PropertyService.getDefaultProperty();
-        propertyId = defaultProp.id;
-      }
+      const propertyId = req.user?.propertyId;
 
       if (!roomNumber) {
         return res.status(400).json({
@@ -172,12 +156,7 @@ export class RoomController {
   static async createRoomCategory(req: Request, res: Response, next: NextFunction) {
     try {
       const { name, description, basePrice } = req.body;
-      let propertyId = req.user?.propertyId || (req.body as any).propertyId;
-
-      if (!propertyId) {
-        const defaultProp = await PropertyService.getDefaultProperty();
-        propertyId = defaultProp.id;
-      }
+      const propertyId = req.user?.propertyId;
 
       if (!name || !String(name).trim()) {
         return res.status(400).json({
@@ -209,12 +188,7 @@ export class RoomController {
    */
   static async getRoomCategories(req: Request, res: Response, next: NextFunction) {
     try {
-      let propertyId = req.user?.propertyId || (req.query.propertyId as string | undefined);
-
-      if (!propertyId) {
-        const defaultProp = await PropertyService.getDefaultProperty();
-        propertyId = defaultProp.id;
-      }
+      const propertyId = req.user?.propertyId;
 
       const categories = await RoomService.getRoomCategories(propertyId!);
 
@@ -229,18 +203,46 @@ export class RoomController {
   }
 
   /**
+   * PATCH /api/rooms/:roomId
+   * Updates a room's number, price, size or category
+   */
+  static async updateRoom(req: Request, res: Response, next: NextFunction) {
+    try {
+      const roomId = req.params.roomId as string;
+      const propertyId = req.user?.propertyId;
+      const { roomNumber, pricePerNight, roomSize, roomCategoryId } = req.body ?? {};
+
+      const result = await RoomService.updateRoom(
+        roomId,
+        {
+          ...(roomNumber !== undefined ? { roomNumber } : {}),
+          ...(pricePerNight !== undefined
+            ? { pricePerNight: pricePerNight === null ? null : Number(pricePerNight) }
+            : {}),
+          ...(roomSize !== undefined ? { roomSize } : {}),
+          ...(roomCategoryId !== undefined ? { roomCategoryId } : {}),
+        },
+        propertyId
+      );
+
+      res.json({
+        success: true,
+        message: `Room #${result.roomNumber} updated successfully`,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * DELETE /api/rooms/:roomId
    * Deletes a room by ID with reservation checks
    */
   static async deleteRoom(req: Request, res: Response, next: NextFunction) {
     try {
       const roomId = req.params.roomId as string;
-      let propertyId = req.user?.propertyId;
-
-      if (!propertyId) {
-        const defaultProp = await PropertyService.getDefaultProperty();
-        propertyId = defaultProp.id;
-      }
+      const propertyId = req.user?.propertyId;
 
       const result = await RoomService.deleteRoom(roomId, propertyId);
 
@@ -261,12 +263,7 @@ export class RoomController {
   static async deleteRoomCategory(req: Request, res: Response, next: NextFunction) {
     try {
       const categoryId = req.params.categoryId as string;
-      let propertyId = req.user?.propertyId;
-
-      if (!propertyId) {
-        const defaultProp = await PropertyService.getDefaultProperty();
-        propertyId = defaultProp.id;
-      }
+      const propertyId = req.user?.propertyId;
 
       const result = await RoomService.deleteRoomCategory(categoryId, propertyId);
 
@@ -286,12 +283,7 @@ export class RoomController {
    */
   static async getRoomsInventory(req: Request, res: Response, next: NextFunction) {
     try {
-      let propertyId = req.user?.propertyId;
-
-      if (!propertyId) {
-        const defaultProp = await PropertyService.getDefaultProperty();
-        propertyId = defaultProp.id;
-      }
+      const propertyId = req.user?.propertyId;
 
       const inventory = await RoomService.getRoomsInventory(propertyId);
 
