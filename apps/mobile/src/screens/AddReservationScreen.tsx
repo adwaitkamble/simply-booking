@@ -16,6 +16,7 @@ import { ApiClient } from '../api/client';
 import { GoogleCalendarDatePickerModal } from '../components/GoogleCalendarDatePickerModal';
 import { colors, borderRadius, shadows } from '../theme';
 import { sendWhatsAppConfirmation } from '../utils/whatsapp';
+import { useAuth } from '../context/AuthContext';
 
 interface AddReservationScreenProps {
   initialRoomId?: string;
@@ -41,6 +42,7 @@ export const AddReservationScreen: React.FC<AddReservationScreenProps> = ({
   onBack,
   onBookingSuccess,
 }) => {
+  const { property } = useAuth();
   // Helper to format ISO date to DD-MM-YYYY format
   const formatIsoToDdMmYyyy = (isoStr: string) => {
     if (!isoStr) return '';
@@ -360,13 +362,15 @@ export const AddReservationScreen: React.FC<AddReservationScreenProps> = ({
                 sendWhatsAppConfirmation({
                   guestName: guestName || 'Guest',
                   guestPhone: guestPhone || '',
+                  propertyName: property?.name || '',
+                  roomType: selectedRoom?.categoryName,
+                  roomNumber: selectedRoom?.roomNumber,
                   roomName: selectedRoom?.name || selectedRoom?.roomNumber || 'Room',
                   checkIn: formatIsoToDdMmYyyy(checkIn),
                   checkOut: formatIsoToDdMmYyyy(checkOut),
                   totalAmount: calculations.totalAmount,
                   advancePaid: Number(advancePaid) || 0,
                   balanceAmount: calculations.balance,
-                  bookingId: successData?.bookingId || successData?.id,
                 });
                 if (successData?.id) {
                   ApiClient.sendWhatsAppNotification(successData.id).catch(() => {});

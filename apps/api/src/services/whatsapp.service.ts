@@ -5,13 +5,14 @@ export interface WhatsAppPayload {
   guestPhone: string;
   propertyName: string;
   roomNumber: string;
+  /** Room category, e.g. "Single Bed Room" */
+  roomType?: string;
   checkIn: string;
   checkOut: string;
   totalAmount: number;
   advancePaid?: number;
   pendingAmount: number;
   currency: string;
-  bookingRef?: string;
   calendarLink?: string;
 }
 
@@ -25,13 +26,13 @@ export class WhatsAppService {
       guestPhone,
       propertyName,
       roomNumber,
+      roomType,
       checkIn,
       checkOut,
       totalAmount,
       advancePaid = 0,
       pendingAmount,
       currency,
-      bookingRef,
       calendarLink,
     } = payload;
 
@@ -48,7 +49,8 @@ export class WhatsAppService {
       formattedPhone = `whatsapp:${formattedPhone}`;
     }
 
-    const hotelName = propertyName && propertyName.trim() ? propertyName.trim() : 'Hotel Property';
+    const hotelName = propertyName && propertyName.trim() ? propertyName.trim() : 'our hotel';
+    const roomLine = roomType ? `${roomType} · Room ${roomNumber}` : `Room ${roomNumber}`;
     const formattedTotal = Number(totalAmount).toLocaleString('en-IN');
     const formattedAdvance = Number(advancePaid).toLocaleString('en-IN');
     const formattedPending = Number(pendingAmount).toLocaleString('en-IN');
@@ -57,8 +59,7 @@ export class WhatsAppService {
     const messageBody =
       `Hello ${guestName},\n\n` +
       `Your booking at *${hotelName}* is confirmed! 🎉\n\n` +
-      (bookingRef ? `🆔 *Booking Ref:* ${bookingRef}\n` : '') +
-      `🏨 *Room:* Room ${roomNumber}\n` +
+      `🏨 *Room:* ${roomLine}\n` +
       `📅 *Check-in:* ${checkIn}\n` +
       `📅 *Check-out:* ${checkOut}\n` +
       `💰 *Total Amount:* ${currencySymbol}${formattedTotal}\n` +

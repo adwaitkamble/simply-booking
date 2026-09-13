@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { shadows } from '../theme';
 import { sendWhatsAppConfirmation } from '../utils/whatsapp';
+import { useAuth } from '../context/AuthContext';
 
 const cardShadow = Platform.OS === 'web'
   ? { boxShadow: '0px 3px 8px rgba(15, 23, 42, 0.05)' as any }
@@ -46,6 +47,7 @@ interface BookingCardProps {
 }
 
 export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPressView }) => {
+  const { property } = useAuth();
   const safeBooking = booking || ({} as BookingCardData);
   const {
     bookingId = '#—',
@@ -80,13 +82,13 @@ export const BookingCard: React.FC<BookingCardProps> = ({ booking, onPressView }
               sendWhatsAppConfirmation({
                 guestName,
                 guestPhone,
+                propertyName: property?.name || '',
                 roomName: roomNameAndPlan,
                 checkIn: dates.checkIn,
                 checkOut: dates.checkOut,
                 totalAmount: financials.totalAmount,
                 advancePaid: financials.advancePaid,
                 balanceAmount: financials.balanceAmount,
-                bookingId,
               });
             }}
             activeOpacity={0.7}

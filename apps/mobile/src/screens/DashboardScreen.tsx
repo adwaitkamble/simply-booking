@@ -1204,13 +1204,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                       sendWhatsAppConfirmation({
                         guestName: selectedReservation.guest?.name || 'Guest',
                         guestPhone: selectedReservation.guest?.phone || '',
+                        propertyName: property?.name || '',
+                        roomType: selectedReservation.room?.roomCategory?.name,
+                        roomNumber: selectedReservation.room?.roomNumber,
                         roomName: selectedReservation.room?.roomNumber ? `Room ${selectedReservation.room.roomNumber}` : 'Room',
                         checkIn: selectedReservation.checkIn.slice(0, 10),
                         checkOut: selectedReservation.checkOut.slice(0, 10),
                         totalAmount: selectedReservation.totalAmount,
                         advancePaid: selectedReservation.advancePaid || 0,
                         balanceAmount: Math.max(0, Number(selectedReservation.totalAmount) - Number(selectedReservation.advancePaid || 0)),
-                        bookingId: selectedReservation.bookingId || selectedReservation.id,
                       });
                       if (selectedReservation.id) {
                         ApiClient.sendWhatsAppNotification(selectedReservation.id).catch(() => {});
