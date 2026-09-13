@@ -95,6 +95,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   // Modals
   const [selectedReservation, setSelectedReservation] = useState<any | null>(null);
   const [showAddRoomModal, setShowAddRoomModal] = useState<boolean>(false);
+  // null while adding; holds the room being edited otherwise
+  const [editingRoom, setEditingRoom] = useState<any | null>(null);
   const [newRoomNumber, setNewRoomNumber] = useState('');
   const [newRoomCategory, setNewRoomCategory] = useState('');
   const [newRoomPrice, setNewRoomPrice] = useState('');
@@ -336,7 +338,28 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     }
   };
 
-  // Add Room Submission
+  const openAddRoomModal = () => {
+    setEditingRoom(null);
+    setNewRoomNumber('');
+    setNewRoomPrice('');
+    setNewRoomSize('');
+    setNewRoomStatus('Clean');
+    setRoomModalError(null);
+    setNewRoomCategory(categories[0]?.id || '');
+    setShowAddRoomModal(true);
+  };
+
+  const openEditRoomModal = (room: any) => {
+    setEditingRoom(room);
+    setNewRoomNumber(String(room?.roomNumber ?? ''));
+    setNewRoomPrice(room?.pricePerNight != null ? String(room.pricePerNight) : '');
+    setNewRoomSize(room?.roomSize || '');
+    setNewRoomCategory(room?.roomCategory?.id || room?.roomCategoryId || '');
+    setRoomModalError(null);
+    setShowAddRoomModal(true);
+  };
+
+  // Add / Edit Room Submission
   const handleSaveRoom = async () => {
     if (!newRoomNumber.trim()) {
       setRoomModalError('Room Number is required (e.g. 301)');
@@ -351,20 +374,31 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       setSavingRoom(true);
       setRoomModalError(null);
       const customPrice = newRoomPrice.trim() !== '' ? parseFloat(newRoomPrice) : undefined;
-      await ApiClient.createRoom({
-        roomNumber: newRoomNumber.trim(),
-        roomCategoryId: newRoomCategory,
-        pricePerNight: customPrice,
-        roomSize: newRoomSize.trim() || undefined,
-        status: newRoomStatus,
-      });
+
+      if (editingRoom) {
+        await ApiClient.updateRoom(editingRoom.id, {
+          roomNumber: newRoomNumber.trim(),
+          roomCategoryId: newRoomCategory,
+          pricePerNight: customPrice ?? null,
+          roomSize: newRoomSize.trim() || null,
+        });
+      } else {
+        await ApiClient.createRoom({
+          roomNumber: newRoomNumber.trim(),
+          roomCategoryId: newRoomCategory,
+          pricePerNight: customPrice,
+          roomSize: newRoomSize.trim() || undefined,
+          status: newRoomStatus,
+        });
+      }
       setShowAddRoomModal(false);
+      setEditingRoom(null);
       setNewRoomNumber('');
       setNewRoomPrice('');
       setNewRoomSize('');
       loadData();
     } catch (err: any) {
-      setRoomModalError(err.message || 'Failed to create room');
+      setRoomModalError(err.message || (editingRoom ? 'Failed to update room' : 'Failed to create room'));
     } finally {
       setSavingRoom(false);
     }
@@ -663,7 +697,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 <Text style={styles.leftHeaderTitle}>Rooms</Text>
                 <TouchableOpacity
                   style={styles.addRoomBtn}
-                  onPress={() => setShowAddRoomModal(true)}
+                  onPress={openAddRoomModal}
                   activeOpacity={0.8}
                 >
                   <Text style={styles.addRoomBtnText}>+</Text>
@@ -677,13 +711,22 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   <View key={room.id} style={styles.leftRoomCell}>
                     <View style={styles.roomHeaderRow}>
                       <Text style={styles.roomNumberText}>#{room.roomNumber}</Text>
-                      <TouchableOpacity
-                        onPress={() => handleDeleteRoom(room)}
-                        style={styles.deleteRoomBtn}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Text style={styles.deleteRoomBtnText}>🗑️</Text>
-                      </TouchableOpacity>
+                      <View style={styles.roomActionsRow}>
+                        <TouchableOpacity
+                          onPress={() => openEditRoomModal(room)}
+                          style={styles.editRoomBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Text style={styles.editRoomBtnText}>✏️</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleDeleteRoom(room)}
+                          style={styles.deleteRoomBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Text style={styles.deleteRoomBtnText}>🗑️</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                     <Text style={styles.roomCategoryNameText} numberOfLines={1}>
                       {room.roomCategory?.name || 'Standard'}
@@ -861,9 +904,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add In-House Room</Text>
+              <Text style={styles.modalTitle}>
+                {editingRoom ? `Edit Room #${editingRoom.roomNumber}` : 'Add In-House Room'}
+              </Text>
               <TouchableOpacity
-                onPress={() => setShowAddRoomModal(false)}
+                onPress={() => {
+                  setShowAddRoomModal(false);
+                  setEditingRoom(null);
+                }}
                 style={styles.modalCloseBtn}
               >
                 <Text style={styles.modalCloseText}>✕</Text>
@@ -1008,33 +1056,40 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               placeholderTextColor="#94a3b8"
             />
 
-            <Text style={styles.inputLabel}>Initial Status</Text>
-            <View style={styles.statusOptionRow}>
-              {(['Clean', 'Dirty', 'Maintenance'] as RoomStatus[]).map((st) => (
-                <TouchableOpacity
-                  key={st}
-                  style={[
-                    styles.statusRadioChip,
-                    newRoomStatus === st && styles.statusRadioChipActive,
-                  ]}
-                  onPress={() => setNewRoomStatus(st)}
-                >
-                  <Text
+            {!editingRoom ? (
+              <>
+              <Text style={styles.inputLabel}>Initial Status</Text>
+              <View style={styles.statusOptionRow}>
+                {(['Clean', 'Dirty', 'Maintenance'] as RoomStatus[]).map((st) => (
+                  <TouchableOpacity
+                    key={st}
                     style={[
-                      styles.statusRadioText,
-                      newRoomStatus === st && styles.statusRadioTextActive,
+                      styles.statusRadioChip,
+                      newRoomStatus === st && styles.statusRadioChipActive,
                     ]}
+                    onPress={() => setNewRoomStatus(st)}
                   >
-                    {st}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                    <Text
+                      style={[
+                        styles.statusRadioText,
+                        newRoomStatus === st && styles.statusRadioTextActive,
+                      ]}
+                    >
+                      {st}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              </>
+            ) : null}
 
             <View style={styles.modalActionRow}>
               <TouchableOpacity
                 style={styles.modalCancelBtn}
-                onPress={() => setShowAddRoomModal(false)}
+                onPress={() => {
+                  setShowAddRoomModal(false);
+                  setEditingRoom(null);
+                }}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
@@ -1047,7 +1102,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 {savingRoom ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.modalSubmitText}>Save Room</Text>
+                  <Text style={styles.modalSubmitText}>
+                    {editingRoom ? 'Save Changes' : 'Save Room'}
+                  </Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -1452,6 +1509,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#0066FF',
+  },
+  roomActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  editRoomBtn: {
+    padding: 2,
+  },
+  editRoomBtnText: {
+    fontSize: 11,
   },
   deleteRoomBtn: {
     padding: 2,

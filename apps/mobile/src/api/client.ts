@@ -532,6 +532,28 @@ export const ApiClient = {
   },
 
   /**
+   * Update an existing room (number, price, size or category)
+   */
+  async updateRoom(
+    roomId: string,
+    data: {
+      roomNumber?: string;
+      pricePerNight?: number | null;
+      roomSize?: string | null;
+      roomCategoryId?: string;
+    }
+  ): Promise<any> {
+    const res = await fetch(`${resolveApiBaseUrl()}/rooms/${roomId}`, {
+      method: 'PATCH',
+      headers: getRequestHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    const json = await safeParseJsonResponse(res, 'Failed to update room');
+    return json.data;
+  },
+
+  /**
    * Delete a room by ID
    */
   async deleteRoom(roomId: string): Promise<any> {

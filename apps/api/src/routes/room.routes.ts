@@ -31,5 +31,8 @@ roomRouter.delete('/categories/:categoryId', RoomController.deleteRoomCategory);
 // POST /api/rooms - Create a new room on the fly
 roomRouter.post('/', RoomController.createRoom);
 
+// PATCH /api/rooms/:roomId - Update a room (number, price, size, category)
+roomRouter.patch('/:roomId', RoomController.updateRoom);
+
 // DELETE /api/rooms/:roomId - Delete a room by ID
 roomRouter.delete('/:roomId', RoomController.deleteRoom);
