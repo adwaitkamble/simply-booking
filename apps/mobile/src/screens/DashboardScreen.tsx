@@ -180,12 +180,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       const defaultProp = await ApiClient.fetchDefaultProperty();
       setProperty(defaultProp);
 
-      if (defaultProp?.roomCategories) {
+      if (defaultProp?.roomCategories && defaultProp.roomCategories.length > 0) {
         setCategories(defaultProp.roomCategories);
-        if (defaultProp.roomCategories.length > 0 && !newRoomCategory) {
-          setNewRoomCategory(defaultProp.roomCategories[0].id);
-          setNewRoomPrice(String(defaultProp.roomCategories[0].basePrice));
-        }
+        setNewRoomCategory((prev) => prev || defaultProp.roomCategories[0].id);
+        setNewRoomPrice((prev) => prev || String(defaultProp.roomCategories[0].basePrice));
       }
 
       // 2. Fetch all rooms for this property
@@ -206,7 +204,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [newRoomCategory]);
+  }, []);
 
   useEffect(() => {
     loadData();

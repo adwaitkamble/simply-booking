@@ -34,8 +34,9 @@ if (typeof global !== 'undefined') {
     console.error('💥 Global JS Error:', msg, error?.stack);
     if (_globalErrorHandler) {
       _globalErrorHandler(`[${isFatal ? 'FATAL' : 'ERROR'}] ${msg}\n\n${error?.stack || ''}`);
+    } else if (__DEV__ && originalHandler) {
+      originalHandler(error, isFatal);
     }
-    if (originalHandler) originalHandler(error, isFatal);
   });
 }
 
@@ -161,23 +162,19 @@ export default function App() {
     initializeApp();
   }, []);
 
-  if (!isAppReady) {
-    return (
-      <SafeAreaProvider>
-        <SplashScreen error={splashError} onRetry={initializeApp} />
-      </SafeAreaProvider>
-    );
-  }
-
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
-        <AuthProvider>
-          <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
-            <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-            <Navigator />
-          </SafeAreaView>
-        </AuthProvider>
+        {!isAppReady ? (
+          <SplashScreen error={splashError} onRetry={initializeApp} />
+        ) : (
+          <AuthProvider>
+            <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
+              <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+              <Navigator />
+            </SafeAreaView>
+          </AuthProvider>
+        )}
       </SafeAreaProvider>
     </ErrorBoundary>
   );

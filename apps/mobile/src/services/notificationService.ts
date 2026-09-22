@@ -125,9 +125,10 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
   // Android notification channel setup
   if (Platform.OS === 'android' && NotificationsMod) {
     try {
+      const importanceLevel = NotificationsMod.AndroidImportance?.MAX ?? 4;
       await NotificationsMod.setNotificationChannelAsync('default', {
         name: 'default',
-        importance: NotificationsMod.AndroidImportance.MAX,
+        importance: importanceLevel,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#0066FF',
       });
