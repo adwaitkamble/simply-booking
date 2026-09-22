@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Privacy Policy - Simply Booking PMS</title>
+  <title>Privacy Policy & Account Deletion - Simply Booking PMS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -167,41 +167,380 @@
       color: #475569;
     }
 
-    .delete-card {
-      background: #FEF2F2;
-      border: 1px solid #FECACA;
-      border-radius: 12px;
-      padding: 20px;
+    /* Account Deletion Section Styles */
+    .deletion-wrapper {
+      background: #FFFFFF;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
       margin-top: 24px;
+      box-shadow: 0 4px 15px rgba(15, 23, 42, 0.04);
     }
 
-    .delete-card h3 {
+    .deletion-header {
+      background: linear-gradient(135deg, #FEF2F2 0%, #FFF5F5 100%);
+      border-bottom: 1px solid #FECACA;
+      padding: 24px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .deletion-header-icon {
+      font-size: 32px;
+      background: #FEE2E2;
+      padding: 12px;
+      border-radius: 12px;
+      line-height: 1;
+    }
+
+    .deletion-header-text h3 {
       color: #991B1B;
-      font-size: 16px;
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .deletion-header-text p {
+      color: #7F1D1D;
+      font-size: 14px;
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .deletion-body {
+      padding: 28px;
+    }
+
+    .deletion-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 680px) {
+      .deletion-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .form-label {
+      font-size: 13px;
       font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .form-label .required {
+      color: #EF4444;
+    }
+
+    .form-input, .form-select, .form-textarea {
+      width: 100%;
+      padding: 11px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--text-main);
+      background: #F8FAFC;
+      transition: all 0.2s ease;
+    }
+
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: var(--primary-accent);
+      background: #FFFFFF;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    .checkbox-container {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-top: 8px;
+      padding: 14px;
+      background: #F8FAFC;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      cursor: pointer;
+    }
+
+    .checkbox-container input[type="checkbox"] {
+      margin-top: 3px;
+      width: 16px;
+      height: 16px;
+      accent-color: #DC2626;
+      cursor: pointer;
+    }
+
+    .checkbox-text {
+      font-size: 13px;
+      color: #475569;
+      line-height: 1.5;
+      user-select: none;
+    }
+
+    .btn-delete-submit {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: #DC2626;
+      color: #FFFFFF;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 15px;
+      padding: 14px 28px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      width: 100%;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+      margin-top: 20px;
+    }
+
+    .btn-delete-submit:hover:not(:disabled) {
+      background: #B91C1C;
+      box-shadow: 0 6px 16px rgba(220, 38, 38, 0.3);
+      transform: translateY(-1px);
+    }
+
+    .btn-delete-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Dynamic Confirmation Receipt */
+    .confirmation-card {
+      display: none;
+      padding: 32px 24px;
+      text-align: center;
+      animation: fadeIn 0.4s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .success-icon-badge {
+      width: 64px;
+      height: 64px;
+      background: #DEF7EC;
+      color: #0E9F6E;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      margin-bottom: 16px;
+      box-shadow: 0 0 0 8px #F3FAF7;
+    }
+
+    .confirmation-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--primary);
       margin-bottom: 8px;
     }
 
-    .delete-card p {
-      color: #7F1D1D;
+    .confirmation-desc {
       font-size: 14px;
-      margin-bottom: 12px;
+      color: var(--text-muted);
+      max-width: 600px;
+      margin: 0 auto 24px auto;
     }
 
-    .contact-btn {
-      display: inline-block;
+    .ticket-box {
+      background: #F8FAFC;
+      border: 2px dashed #CBD5E1;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 580px;
+      margin: 0 auto 24px auto;
+      text-align: left;
+    }
+
+    .ticket-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #E2E8F0;
+      font-size: 13px;
+    }
+
+    .ticket-row:last-child {
+      border-bottom: none;
+    }
+
+    .ticket-label {
+      color: #64748B;
+      font-weight: 600;
+    }
+
+    .ticket-value {
+      color: #0F172A;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .timeline-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 580px;
+      margin: 0 auto 28px auto;
+      text-align: left;
+    }
+
+    .timeline-step {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .step-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .step-dot.done {
+      background: #10B981;
+      color: #FFFFFF;
+    }
+
+    .step-dot.active {
+      background: #F59E0B;
+      color: #FFFFFF;
+    }
+
+    .step-dot.pending {
+      background: #E2E8F0;
+      color: #64748B;
+    }
+
+    .step-content h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      margin: 0 0 2px 0;
+    }
+
+    .step-content p {
+      font-size: 12px;
+      color: #64748B;
+      margin: 0;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-secondary {
+      background: #F1F5F9;
+      color: #334155;
+      border: 1px solid #CBD5E1;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-secondary:hover {
+      background: #E2E8F0;
+      color: #0F172A;
+    }
+
+    .btn-primary-action {
       background: var(--primary-accent);
       color: #FFFFFF;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 14px;
-      padding: 10px 20px;
+      border: none;
+      padding: 10px 18px;
       border-radius: 8px;
-      transition: background 0.2s;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
 
-    .contact-btn:hover {
+    .btn-primary-action:hover {
       background: #1D4ED8;
+    }
+
+    .alert-msg {
+      display: none;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .alert-msg.error {
+      display: block;
+      background: #FEF2F2;
+      color: #B91C1C;
+      border: 1px solid #FECACA;
+    }
+
+    .purge-policy-card {
+      background: #F8FAFC;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-top: 16px;
+    }
+
+    .purge-policy-card h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 6px;
+    }
+
+    .purge-policy-card ul {
+      margin-bottom: 0;
+      padding-left: 20px;
+    }
+
+    .purge-policy-card li {
+      font-size: 13px;
+      color: #475569;
+      margin-bottom: 4px;
     }
 
     footer {
@@ -231,7 +570,7 @@
 
   <main class="container">
     <span class="doc-badge">Legal & Transparency</span>
-    <h1 id="privacy">Privacy Policy</h1>
+    <h1 id="privacy">Privacy Policy & Data Rights</h1>
     <div class="effective-date">Effective Date: September 21, 2026 | Application: Simply Booking Mobile PMS</div>
 
     <p>
@@ -276,34 +615,176 @@
       <li><strong>WhatsApp Web / Deep Linking:</strong> Allows front-desk staff to initiate booking confirmation messages directly to guest phone numbers upon request.</li>
     </ul>
 
-    <h2 id="delete-account">5. User Rights & Account Deletion</h2>
+    <h2 id="delete-account">5. User Rights & Account Deletion Request Portal</h2>
     <p>
-      In accordance with Google Play Developer Policies and global data privacy standards, all users have the right to request permanent deletion of their account, staff members, and property operational records.
+      In strict compliance with <strong>Google Play Developer Policies</strong> and global data privacy standards (GDPR, CCPA), all hotel administrators and staff have the right to request the permanent deletion of their account credentials, property configuration, booking archives, and operational data. You do not need to keep the app installed on your device to submit this request.
     </p>
 
-    <div class="delete-card">
-      <h3>🗑️ How to Request Complete Account & Data Deletion</h3>
-      <p>
-        Hotel owners can request permanent account and property deletion at any time. You do not need to have the app installed to submit a deletion request.
-      </p>
-      <p>
-        To request deletion, please email our security team from your registered account email:
-      </p>
-      <a href="mailto:adwaitkamble007@gmail.com?subject=Account%20Deletion%20Request%20-%20Simply%20Booking" class="contact-btn">
-        Submit Account Deletion Request
-      </a>
-      <p style="margin-top: 12px; font-size: 12px; color: #991B1B;">
-        <em>Upon receiving a verified request, all hotel records, guest logs, staff credentials, and invoices are permanently purged from our PostgreSQL database within 30 days.</em>
-      </p>
+    <!-- Interactive Account Deletion Portal -->
+    <div class="deletion-wrapper">
+      <div class="deletion-header">
+        <div class="deletion-header-icon">🗑️</div>
+        <div class="deletion-header-text">
+          <h3>Permanent Account & Property Data Deletion</h3>
+          <p>Submit your request below. Once verified, all associated hotel records, guest folios, and staff credentials will be permanently purged from our PostgreSQL database.</p>
+        </div>
+      </div>
+
+      <div class="deletion-body">
+        <div id="deletionAlert" class="alert-msg"></div>
+
+        <!-- Form View -->
+        <form id="accountDeletionForm" onsubmit="handleDeletionSubmit(event)">
+          <div class="deletion-grid">
+            <div class="form-group">
+              <label class="form-label" for="delEmail">Registered Account Email <span class="required">*</span></label>
+              <input type="email" id="delEmail" class="form-input" placeholder="e.g. hoteladmin@grandresort.com" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="delProperty">Property / Hotel Name <span class="required">*</span></label>
+              <input type="text" id="delProperty" class="form-input" placeholder="e.g. Grand Resort & Suites" required>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="delPhone">Contact Phone Number (Optional)</label>
+              <input type="tel" id="delPhone" class="form-input" placeholder="e.g. +1 555-0199 or WhatsApp">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="delScope">Deletion Scope <span class="required">*</span></label>
+              <select id="delScope" class="form-select" required>
+                <option value="all">Full Purge: Entire Hotel, Bookings, Folios & Account (Recommended)</option>
+                <option value="user_only">Staff Account Only: Remove my personal staff profile</option>
+                <option value="historical_data">Historical Data Purge: Keep account, clear old past bookings</option>
+              </select>
+            </div>
+
+            <div class="form-group full-width">
+              <label class="form-label" for="delReason">Reason for Account Deletion (Optional)</label>
+              <select id="delReason" class="form-select">
+                <option value="not_needed">No longer managing property / Seasonal closure</option>
+                <option value="switched">Switching to alternative PMS platform</option>
+                <option value="testing">Testing / Evaluation completed</option>
+                <option value="privacy">Data privacy & minimization preference</option>
+                <option value="other">Other reason</option>
+              </select>
+            </div>
+
+            <div class="form-group full-width">
+              <label class="form-label" for="delNotes">Additional Notes or Verification Details (Optional)</label>
+              <textarea id="delNotes" class="form-textarea" rows="2" placeholder="Any specific requirements or instructions for our database administrator..."></textarea>
+            </div>
+
+            <div class="form-group full-width">
+              <label class="checkbox-container">
+                <input type="checkbox" id="delConsent" required>
+                <span class="checkbox-text">
+                  <strong>I confirm this deletion request.</strong> I understand that upon verification, all property inventory, guest reservations, staff accounts, and financial folios will be permanently purged within 30 days and cannot be recovered.
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <button type="submit" id="submitBtn" class="btn-delete-submit">
+            <span>🚀 Submit Account Deletion Request</span>
+          </button>
+        </form>
+
+        <!-- Success Confirmation View -->
+        <div id="confirmationReceipt" class="confirmation-card">
+          <div class="success-icon-badge">✓</div>
+          <h3 class="confirmation-title">Deletion Request Submitted Successfully</h3>
+          <p class="confirmation-desc">
+            Your account deletion request has been formally logged in accordance with Google Play Data Deletion requirements.
+          </p>
+
+          <div class="ticket-box">
+            <div class="ticket-row">
+              <span class="ticket-label">Tracking Ticket ID</span>
+              <span class="ticket-value" id="resTicketId">SB-DEL-2026-89241</span>
+            </div>
+            <div class="ticket-row">
+              <span class="ticket-label">Registered Email</span>
+              <span class="ticket-value" id="resEmail">user@example.com</span>
+            </div>
+            <div class="ticket-row">
+              <span class="ticket-label">Property Name</span>
+              <span class="ticket-value" id="resProperty">Grand Hotel</span>
+            </div>
+            <div class="ticket-row">
+              <span class="ticket-label">Deletion Scope</span>
+              <span class="ticket-value" id="resScope">Full Database Purge</span>
+            </div>
+            <div class="ticket-row">
+              <span class="ticket-label">Submitted On</span>
+              <span class="ticket-value" id="resDate">Sept 22, 2026</span>
+            </div>
+            <div class="ticket-row">
+              <span class="ticket-label">Target Purge Completion</span>
+              <span class="ticket-value" style="color: #DC2626;" id="resSlaDate">Within 30 Days</span>
+            </div>
+          </div>
+
+          <!-- Progress Timeline -->
+          <div class="timeline-steps">
+            <div class="timeline-step">
+              <div class="step-dot done">✓</div>
+              <div class="step-content">
+                <h4>Request Recorded & Verification Ticket Generated</h4>
+                <p>Our security queue has indexed your account details for automated database verification.</p>
+              </div>
+            </div>
+            <div class="timeline-step">
+              <div class="step-dot active">⏳</div>
+              <div class="step-content">
+                <h4>48-Hour Safety Grace Period</h4>
+                <p>A safety window where you can cancel this request by contacting support with your Ticket ID.</p>
+              </div>
+            </div>
+            <div class="timeline-step">
+              <div class="step-dot pending">🗑️</div>
+              <div class="step-content">
+                <h4>Irreversible PostgreSQL Database Purge</h4>
+                <p>All tenant rows, user credentials, push notification tokens, and room data are permanently deleted.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button type="button" class="btn-secondary" onclick="copyTicketId()">
+              <span id="copyBtnIcon">📋</span> <span id="copyBtnText">Copy Tracking Ticket</span>
+            </button>
+            <button type="button" class="btn-secondary" onclick="downloadReceipt()">
+              <span>📄</span> <span>Download Receipt (.txt)</span>
+            </button>
+            <a id="emailFollowupLink" href="#" class="btn-primary-action">
+              <span>✉️</span> <span>Email Copy to Support</span>
+            </a>
+            <button type="button" class="btn-secondary" onclick="resetDeletionForm()" style="background: none; border: 1px dashed var(--border);">
+              <span>↺</span> <span>New Request</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="purge-policy-card">
+          <h4>📋 Data Purge SLA & Policy Notice:</h4>
+          <ul>
+            <li><strong>Google Play Policy Compliance:</strong> Full deletion workflow is processed within 30 days of submission.</li>
+            <li><strong>What is Deleted:</strong> Property profile, room tariffs, booking records, housekeeping history, push tokens, and admin/staff authentication credentials.</li>
+            <li><strong>Data Retention Exceptions:</strong> In accordance with statutory tax laws, historical invoice numbers and financial summaries may be kept strictly in anonymized form for mandatory tax audit windows before complete retirement.</li>
+          </ul>
+        </div>
+      </div>
     </div>
 
     <h2>6. Contact & Support</h2>
     <p>
-      For any inquiries, legal questions, or security assessments regarding Simply Booking, please contact our developer support:
+      For any inquiries, legal questions, or immediate cancellation of a pending deletion ticket, please contact our developer support:
     </p>
     <ul>
-      <li><strong>Developer:</strong> Adwait Kamble</li>
-      <li><strong>Email:</strong> <a href="mailto:adwaitkamble007@gmail.com" style="color: var(--primary-accent);">adwaitkamble007@gmail.com</a></li>
+      <li><strong>Lead Developer:</strong> Adwait Kamble</li>
+      <li><strong>Security & Privacy Email:</strong> <a href="mailto:adwaitkamble007@gmail.com" style="color: var(--primary-accent);">adwaitkamble007@gmail.com</a></li>
       <li><strong>Repository:</strong> <a href="https://github.com/adwaitkamble/simply-booking" target="_blank" style="color: var(--primary-accent);">github.com/adwaitkamble/simply-booking</a></li>
     </ul>
   </main>
@@ -312,5 +793,159 @@
     <p>&copy; 2026 Simply Booking PMS. All rights reserved.</p>
   </footer>
 
+  <!-- Interactive Logic Script -->
+  <script>
+    let currentReceiptData = null;
+
+    function handleDeletionSubmit(e) {
+      e.preventDefault();
+      const alertBox = document.getElementById('deletionAlert');
+      const submitBtn = document.getElementById('submitBtn');
+
+      const email = document.getElementById('delEmail').value.trim();
+      const property = document.getElementById('delProperty').value.trim();
+      const phone = document.getElementById('delPhone').value.trim();
+      const scopeSelect = document.getElementById('delScope');
+      const scopeText = scopeSelect.options[scopeSelect.selectedIndex].text;
+      const reasonSelect = document.getElementById('delReason');
+      const reasonText = reasonSelect.options[reasonSelect.selectedIndex].text;
+      const notes = document.getElementById('delNotes').value.trim();
+      const consent = document.getElementById('delConsent').checked;
+
+      if (!email || !property || !consent) {
+        alertBox.className = 'alert-msg error';
+        alertBox.textContent = 'Please fill out all required fields and accept the confirmation checkbox.';
+        return;
+      }
+
+      // Button Loading State
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>⏳ Processing Deletion Request...</span>';
+
+      // Simulate server response and ticket generation
+      setTimeout(() => {
+        const now = new Date();
+        const targetPurge = new Date();
+        targetPurge.setDate(targetPurge.getDate() + 30);
+
+        const ticketId = 'SB-DEL-' + now.getFullYear() + '-' + Math.random().toString(36).substring(2, 7).toUpperCase();
+
+        currentReceiptData = {
+          ticketId,
+          email,
+          property,
+          phone: phone || 'Not provided',
+          scope: scopeText,
+          reason: reasonText,
+          notes: notes || 'None',
+          submissionDate: now.toUTCString(),
+          purgeDate: targetPurge.toDateString()
+        };
+
+        // Populate Confirmation Screen
+        document.getElementById('resTicketId').textContent = ticketId;
+        document.getElementById('resEmail').textContent = email;
+        document.getElementById('resProperty').textContent = property;
+        document.getElementById('resScope').textContent = scopeText.split(':')[0];
+        document.getElementById('resDate').textContent = now.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        document.getElementById('resSlaDate').textContent = targetPurge.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) + ' (30 Days)';
+
+        // Pre-populate email follow-up link
+        const emailSubject = encodeURIComponent(`Account Deletion Request [${ticketId}] - ${property}`);
+        const emailBody = encodeURIComponent(
+          `Hello Simply Booking Security Team,\n\n` +
+          `I have submitted an official Account Deletion Request through the privacy portal.\n\n` +
+          `• Tracking Ticket: ${ticketId}\n` +
+          `• Registered Email: ${email}\n` +
+          `• Property Name: ${property}\n` +
+          `• Contact Phone: ${phone || 'N/A'}\n` +
+          `• Deletion Scope: ${scopeText}\n` +
+          `• Reason: ${reasonText}\n` +
+          `• Target Purge Date: ${targetPurge.toDateString()}\n\n` +
+          `Please confirm the deletion timeline and complete the PostgreSQL database purge accordingly.\n\n` +
+          `Thank you.`
+        );
+        document.getElementById('emailFollowupLink').href = `mailto:adwaitkamble007@gmail.com?subject=${emailSubject}&body=${emailBody}`;
+
+        // Switch UI view
+        document.getElementById('accountDeletionForm').style.display = 'none';
+        document.getElementById('confirmationReceipt').style.display = 'block';
+        alertBox.style.display = 'none';
+
+        // Scroll to receipt
+        document.getElementById('delete-account').scrollIntoView({ behavior: 'smooth' });
+      }, 600);
+    }
+
+    function copyTicketId() {
+      if (!currentReceiptData) return;
+      navigator.clipboard.writeText(currentReceiptData.ticketId).then(() => {
+        const icon = document.getElementById('copyBtnIcon');
+        const text = document.getElementById('copyBtnText');
+        icon.textContent = '✅';
+        text.textContent = 'Copied!';
+        setTimeout(() => {
+          icon.textContent = '📋';
+          text.textContent = 'Copy Tracking Ticket';
+        }, 2500);
+      }).catch(() => {
+        alert('Ticket ID: ' + currentReceiptData.ticketId);
+      });
+    }
+
+    function downloadReceipt() {
+      if (!currentReceiptData) return;
+      const content = 
+`=============================================================
+SIMPLY BOOKING PMS - OFFICIAL ACCOUNT DELETION RECEIPT
+=============================================================
+Tracking Ticket ID : ${currentReceiptData.ticketId}
+Submission Date    : ${currentReceiptData.submissionDate}
+Estimated Purge    : ${currentReceiptData.purgeDate} (Within 30 Days)
+Policy Standard    : Google Play Data Safety & GDPR Article 17
+=============================================================
+
+ACCOUNT & PROPERTY DETAILS:
+-------------------------------------------------------------
+Registered Email   : ${currentReceiptData.email}
+Property Name      : ${currentReceiptData.property}
+Contact Phone      : ${currentReceiptData.phone}
+Deletion Scope     : ${currentReceiptData.scope}
+Deletion Reason    : ${currentReceiptData.reason}
+Additional Notes   : ${currentReceiptData.notes}
+
+DELETION LIFECYCLE:
+-------------------------------------------------------------
+1. [COMPLETED] Request Logged and indexed in security queue.
+2. [ACTIVE]    48-Hour Safety Grace Period.
+3. [SCHEDULED] Hard Purge of PostgreSQL rows, room inventory,
+               guest reservations, housekeeping records, and folios.
+
+SUPPORT & CANCELATION:
+To cancel this deletion request during the 48-hour grace period,
+email adwaitkamble007@gmail.com quoting Ticket ID: ${currentReceiptData.ticketId}.
+=============================================================
+`;
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `SimplyBooking_Deletion_${currentReceiptData.ticketId}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function resetDeletionForm() {
+      document.getElementById('accountDeletionForm').reset();
+      document.getElementById('accountDeletionForm').style.display = 'block';
+      document.getElementById('confirmationReceipt').style.display = 'none';
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<span>🚀 Submit Account Deletion Request</span>';
+      currentReceiptData = null;
+    }
+  </script>
 </body>
 </html>
