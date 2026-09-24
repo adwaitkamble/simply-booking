@@ -21,15 +21,14 @@ import { EditUserScreen } from '../screens/EditUserScreen';
 import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
 import { SupportScreen } from '../screens/SupportScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
-import { HousekeepingScreen } from '../screens/HousekeepingScreen';
 import { InvoiceScreen } from '../screens/InvoiceScreen';
 import { ChannelManagerScreen } from '../screens/ChannelManagerScreen';
 import { registerForPushNotificationsAsync } from '../services/notificationService';
 import { AvailableRoomItem } from '../api/client';
 import { shadows } from '../theme';
 
-type TabName = 'booking' | 'housekeeping' | 'invoicing' | 'channel';
-type ScreenName = 'dashboard' | 'addReservation' | 'bookings' | 'rooms' | 'myTeam' | 'editUser' | 'changePassword' | 'support' | 'notifications' | 'housekeeping' | 'invoicing' | 'channel';
+type TabName = 'booking' | 'invoicing' | 'channel';
+type ScreenName = 'dashboard' | 'addReservation' | 'bookings' | 'rooms' | 'myTeam' | 'editUser' | 'changePassword' | 'support' | 'notifications' | 'invoicing' | 'channel';
 
 interface NavigationState {
   currentTab: TabName;
@@ -100,8 +99,6 @@ export const Navigator: React.FC = () => {
       currentScreen:
         tab === 'booking'
           ? 'dashboard'
-          : tab === 'housekeeping'
-          ? 'housekeeping'
           : tab === 'invoicing'
           ? 'invoicing'
           : 'channel',
@@ -225,7 +222,6 @@ export const Navigator: React.FC = () => {
 
   const tabs: { id: TabName; label: string; icon: string }[] = [
     { id: 'booking', label: 'Calendar', icon: '📅' },
-    { id: 'housekeeping', label: 'Cleaning', icon: '🧹' },
     { id: 'invoicing', label: 'Folio & Bill', icon: '💳' },
     { id: 'channel', label: 'OTA Hub', icon: '🌐' },
   ];
@@ -329,8 +325,6 @@ export const Navigator: React.FC = () => {
             )}
           </>
         )}
-
-        {navState.currentTab === 'housekeeping' && <HousekeepingScreen />}
 
         {navState.currentTab === 'invoicing' && (
           <InvoiceScreen initialReservationId={navState.activeReservationId} />

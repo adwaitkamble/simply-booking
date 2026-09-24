@@ -103,13 +103,34 @@ function resolveApiBaseUrl(): string {
     return customApiBaseUrl;
   }
 
-  // 1. Use EXPO_PUBLIC_API_URL if configured (standalone builds & .env)
-  // In EAS native builds, process.env.EXPO_PUBLIC_* vars are inlined at bundle time
-  if (process.env.EXPO_PUBLIC_API_URL) {
+  // 1. In local development (Expo Go / Dev Client), automatically detect the active Metro host IP
+  // This ensures that when testing on a real device, requests route directly to the laptop's running API.
+  if (__DEV__) {
+    try {
+      const Constants = require('expo-constants')?.default || require('expo-constants');
+      const hostUri =
+        Constants?.expoConfig?.hostUri ||
+        Constants?.manifest2?.extra?.expoClient?.hostUri ||
+        Constants?.manifest?.debuggerHost ||
+        Constants?.manifest?.hostUri;
+
+      if (hostUri) {
+        const host = hostUri.split(':')[0];
+        if (host && host !== 'localhost' && host !== '127.0.0.1') {
+          return `http://${host}:4000/api`;
+        }
+      }
+    } catch {
+      // Expo constants not available
+    }
+  }
+
+  // 2. Use EXPO_PUBLIC_API_URL if configured (standalone builds & .env)
+  if (process.env.EXPO_PUBLIC_API_URL && !process.env.EXPO_PUBLIC_API_URL.includes('15.252.181.3')) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
 
-  // 2. During development: use Metro bundler host IP (e.g. 192.168.0.101:8081)
+  // 3. Dynamic Metro host detection fallback
   try {
     const Constants = require('expo-constants')?.default || require('expo-constants');
     const hostUri =
@@ -128,8 +149,8 @@ function resolveApiBaseUrl(): string {
     // Expo constants not available
   }
 
-  // 3. Fallback
-  return 'http://192.168.0.101:4000/api';
+  // 4. Default Local Network Fallback
+  return 'http://192.168.0.104:4000/api';
 }
 
 function getRequestHeaders(customHeaders: Record<string, string> = {}): Record<string, string> {

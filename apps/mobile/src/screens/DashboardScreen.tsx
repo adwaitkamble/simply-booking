@@ -46,7 +46,7 @@ interface DashboardScreenProps {
   onOpenSupport?: () => void;
   onOpenNotifications?: () => void;
   onLogout?: () => void;
-  onNavigateTab?: (tab: 'booking' | 'housekeeping' | 'invoicing' | 'channel') => void;
+  onNavigateTab?: (tab: 'booking' | 'invoicing' | 'channel') => void;
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({
@@ -1296,13 +1296,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               if (onNavigateTab) onNavigateTab('invoicing');
               break;
             case 'additional_services':
-              if (onNavigateTab) onNavigateTab('housekeeping');
+              if (Platform.OS === 'web') {
+                window.alert('Additional Services section is coming soon.');
+              } else {
+                Alert.alert('Simply Booking', 'Additional Services section is coming soon.');
+              }
               break;
             case 'my_team':
               if (onOpenMyTeam) {
                 onOpenMyTeam();
-              } else if (onNavigateTab) {
-                onNavigateTab('housekeeping');
               }
               break;
             case 'password_change':

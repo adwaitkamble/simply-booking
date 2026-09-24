@@ -44,15 +44,22 @@ export class InvoiceService {
       throw error;
     }
 
-    // 2. Compute nights and base room charge
+    // 2. Compute stay duration (nights)
     const d1 = new Date(reservation.checkIn);
     const d2 = new Date(reservation.checkOut);
     const diffTime = d2.getTime() - d1.getTime();
     const nights = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-    const basePrice = (reservation.room as any).pricePerNight ?? reservation.room.roomCategory.basePrice;
-    const roomCharge = Math.round(nights * basePrice * 100) / 100;
 
-    // 3. Format ancillary items
+    // 3. Determine agreed room rate per night (inclusive of GST)
+    // If reservation has a custom totalAmount set during booking, use it as agreed stay price
+    const agreedTotalStayAmount = reservation.totalAmount > 0
+      ? reservation.totalAmount
+      : (nights * ((reservation.room as any).pricePerNight ?? reservation.room.roomCategory.basePrice));
+
+    const ratePerNightInclusive = Math.round((agreedTotalStayAmount / nights) * 100) / 100;
+    const roomStayGross = Math.round(nights * ratePerNightInclusive * 100) / 100;
+
+    // 4. Format ancillary items
     const formattedAncillaryItems = ancillaryItems.map((item) => {
       const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
       const totalItemAmount = Math.round(Number(item.amount) * quantity * 100) / 100;
@@ -64,17 +71,105 @@ export class InvoiceService {
       };
     });
 
-    // 4. Calculate subtotal
     const ancillaryTotal = formattedAncillaryItems.reduce((acc, curr) => acc + curr.amount, 0);
-    const subtotal = Math.round((roomCharge + ancillaryTotal) * 100) / 100;
 
-    // 5. Calculate dynamic tax (18% standard hotel GST / occupancy tax)
+    // 5. Total Gross Charges (agreed room stay + add-ons, inclusive of GST)
+    const grossTotal = Math.round((roomStayGross + ancillaryTotal) * 100) / 100;
+
+    // 6. GST Inclusive Decomposition (Standard 18% GST: 9% CGST + 9% SGST)
     const taxRate = 0.18;
-    const taxAmount = Math.round(subtotal * taxRate * 100) / 100;
-    const grandTotal = Math.round((subtotal + taxAmount) * 100) / 100;
+    const taxableBase = Math.round((grossTotal / (1 + taxRate)) * 100) / 100;
+    const totalTax = Math.round((grossTotal - taxableBase) * 100) / 100;
+    const subtotal = taxableBase;
+    const taxAmount = totalTax;
+    const grandTotal = grossTotal;
 
-    // 6. Execute atomic creation in PostgreSQL
+    // 7. Check for existing invoice for this reservation to allow update/re-calculation
+    const existingInvoice = await prisma.invoices.findFirst({
+      where: { reservationId: reservation.id },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        items: true,
+        guest: true,
+        reservation: {
+          include: {
+            room: {
+              include: {
+                roomCategory: {
+                  include: {
+                    property: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // If already Paid, return existing settled invoice
+    if (existingInvoice && existingInvoice.status === 'Paid') {
+      return existingInvoice;
+    }
+
+    const itemsData = [
+      {
+        description: `${reservation.room.roomCategory.name} - Room ${reservation.room.roomNumber} (${nights} night${nights > 1 ? 's' : ''} @ ₹${ratePerNightInclusive.toFixed(2)}/night incl. GST)`,
+        amount: roomStayGross,
+        quantity: nights,
+        category: 'Room' as InvoiceItemCategory,
+      },
+      ...formattedAncillaryItems.map((item) => ({
+        description: item.description,
+        amount: item.amount,
+        quantity: item.quantity,
+        category: item.category as InvoiceItemCategory,
+      })),
+    ];
+
+    // 8. Execute atomic creation / update in PostgreSQL
     const invoice = await prisma.$transaction(async (tx) => {
+      if (existingInvoice) {
+        await tx.invoiceItems.deleteMany({
+          where: { invoiceId: existingInvoice.id },
+        });
+
+        const updated = await tx.invoices.update({
+          where: { id: existingInvoice.id },
+          data: {
+            subtotal,
+            taxAmount,
+            grandTotal,
+            items: {
+              create: itemsData,
+            },
+          },
+          include: {
+            items: true,
+            reservation: {
+              include: {
+                guest: true,
+                room: {
+                  include: {
+                    roomCategory: {
+                      include: {
+                        property: {
+                          include: {
+                            chain: true,
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            guest: true,
+          },
+        });
+        return updated;
+      }
+
       const createdInvoice = await tx.invoices.create({
         data: {
           reservationId: reservation.id,
@@ -84,20 +179,7 @@ export class InvoiceService {
           grandTotal,
           status: 'Unpaid',
           items: {
-            create: [
-              {
-                description: `${reservation.room.roomCategory.name} - Room ${reservation.room.roomNumber} (${nights} night${nights > 1 ? 's' : ''} @ ₹${basePrice.toFixed(2)}/night)`,
-                amount: roomCharge,
-                quantity: nights,
-                category: 'Room',
-              },
-              ...formattedAncillaryItems.map((item) => ({
-                description: item.description,
-                amount: item.amount,
-                quantity: item.quantity,
-                category: item.category as any,
-              })),
-            ],
+            create: itemsData,
           },
         },
         include: {
@@ -221,6 +303,20 @@ export class InvoiceService {
         include: {
           items: true,
           guest: true,
+          reservation: {
+            include: {
+              guest: true,
+              room: {
+                include: {
+                  roomCategory: {
+                    include: {
+                      property: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       });
 
